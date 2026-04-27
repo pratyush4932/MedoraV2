@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertTriangle, ArrowLeft, FileText, Pill, RefreshCw, Sparkles } from 'lucide-react-native';
+import { AlertTriangle, ArrowLeft, ExternalLink, FileText, Pill, RefreshCw, Sparkles } from 'lucide-react-native';
 import { COLORS, ROUNDING, SHADOWS, SPACING } from '../../constants/theme';
 import { Card } from '../../components/common/Card';
 import { recordService } from '../../services/api';
@@ -300,6 +301,21 @@ export default function AISummaryScreen() {
           </View>
         )}
 
+        {/* View Original Document Button */}
+        {record && (record.signed_url || record.file_url) && (
+          <TouchableOpacity
+            style={styles.viewFileBtn}
+            onPress={() => {
+              const url = record.signed_url || record.file_url;
+              if (url) Linking.openURL(url);
+            }}
+            activeOpacity={0.8}
+          >
+            <ExternalLink size={18} color={COLORS.white} />
+            <Text style={styles.viewFileBtnText}>View Original Document</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Disclaimer */}
         <View style={styles.disclaimer}>
           <Text style={styles.disclaimerText}>
@@ -477,5 +493,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
     gap: 16,
+  },
+  viewFileBtn: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.primary,
+    borderRadius: ROUNDING.lg,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  viewFileBtnText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

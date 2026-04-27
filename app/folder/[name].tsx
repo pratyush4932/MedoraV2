@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
   ArrowLeft, 
-  ExternalLink, 
-  FileText, 
-  ChevronDown, 
-  ChevronUp,
-  Sparkles
+  FileText,
+  ChevronRight
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { recordService } from '../../services/api';
@@ -19,7 +16,6 @@ export default function FolderDetailScreen() {
   const router = useRouter();
   const [records, setRecords] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFolderRecords();
@@ -49,14 +45,25 @@ export default function FolderDetailScreen() {
     }
   }, [records]);
 
-  const handleViewFile = (url: string) => {
-    if (url) {
-      Linking.openURL(url);
+  const getDocTitle = (record: any) => {
+    if (record.status === 'processing') return 'Generating AI summary...';
+    let ai = record.ai_summary;
+    if (typeof ai === 'string' && ai.startsWith('{')) {
+      try { ai = JSON.parse(ai); } catch (e) {}
     }
+    const reports = ai?.reports || record.reports;
+    if (reports && Array.isArray(reports) && reports.length > 0) return reports[0];
+    return ai?.title || record.record_name || record.file_type || 'Medical Record';
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
+  const getDocDate = (record: any) => {
+    const date = record.visit_date || record.created_at || record.uploaded_at;
+    if (!date) return 'Recent';
+    try {
+      return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return 'Recent';
+    }
   };
 
   if (isLoading) {
@@ -79,105 +86,34 @@ export default function FolderDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.intro}>
-          <Text style={styles.countText}>{records.length} Documents in this folder</Text>
+          <Text style={styles.countText}>{records.length} Document{records.length !== 1 ? 's' : ''} in this folder</Text>
         </View>
 
         {records.length > 0 ? (
-          records.map((record, index) => (
-            <View key={record.id || index} style={styles.recordCard}>
-              <TouchableOpacity 
-                style={styles.recordHeader} 
-                onPress={() => toggleExpand(record.id)}
+          <View style={styles.docsList}>
+            {records.map((record, index) => (
+              <TouchableOpacity
+                key={record.id || index}
+                style={[
+                  styles.docItem,
+                  index === records.length - 1 && styles.docItemLast,
+                ]}
                 activeOpacity={0.7}
+                onPress={() => router.push(`/summary/${record.id}`)}
               >
-                <View style={styles.recordIconBox}>
-                  <FileText size={20} color={COLORS.primary} />
+                <View style={styles.docIconBox}>
+                  <FileText size={22} color={COLORS.primary} />
                 </View>
-                <View style={styles.recordMainInfo}>
-                  <Text style={styles.recordTitle}>
-                    {(() => {
-                      let ai = record.ai_summary;
-                      if (typeof ai === 'string' && ai.startsWith('{')) {
-                        try { ai = JSON.parse(ai); } catch (e) {}
-                      }
-                      
-                      const reports = ai?.reports || record.reports;
-                      if (reports && Array.isArray(reports) && reports.length > 0) return reports[0];
-                      
-                      return ai?.title || record.record_name || record.file_type || 'Medical Record';
-                    })()}
+                <View style={styles.docInfo}>
+                  <Text style={styles.docTitle} numberOfLines={1}>
+                    {getDocTitle(record)}
                   </Text>
-                  <Text style={styles.recordDate}>
-                    {(() => {
-                      const date = record.visit_date || record.created_at || record.uploaded_at;
-                      if (!date) return 'Recent';
-                      try {
-                        return new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                      } catch (e) {
-                        return 'Recent';
-                      }
-                    })()}
-                  </Text>
+                  <Text style={styles.docMeta}>{getDocDate(record)}</Text>
                 </View>
-                {expandedId === record.id ? (
-                  <ChevronUp size={20} color={COLORS.text.secondary} />
-                ) : (
-                  <ChevronDown size={20} color={COLORS.text.secondary} />
-                )}
+                <ChevronRight size={20} color={COLORS.text.secondary} />
               </TouchableOpacity>
-
-              {(expandedId === record.id || index === 0 && !expandedId) && (
-                <View style={styles.recordDetails}>
-                  <View style={styles.divider} />
-                  
-                  <View style={styles.summarySection}>
-                    <View style={styles.summaryHeader}>
-                      <Sparkles size={16} color={COLORS.primary} />
-                      <Text style={styles.summaryTitle}>AI Summary</Text>
-                    </View>
-                    <Text style={styles.summaryText}>
-                      {record.status === 'processing' ? (
-                        "Generating AI summary..."
-                      ) : (
-                        (() => {
-                          let ai = record.ai_summary;
-                          if (typeof ai === 'string' && ai.startsWith('{')) {
-                            try { ai = JSON.parse(ai); } catch (e) {}
-                          }
-                          
-                          // Check inside ai_summary object
-                          if (typeof ai === 'object' && ai !== null) {
-                            const findings = ai.key_findings?.join(' ') || ai.findings || ai.simple_summary;
-                            if (findings) return findings;
-                          }
-                          
-                          // Check top-level fields on record
-                          const topFindings = record.key_findings || record.findings || record.simple_summary;
-                          if (topFindings) {
-                            return Array.isArray(topFindings) ? topFindings.join(' ') : topFindings;
-                          }
-
-                          if (typeof ai === 'object' && ai !== null) {
-                            return ai.simple_summary || 'Analysis complete. AI summary is available in the detailed view.';
-                          }
-                          
-                          return typeof ai === 'string' ? ai : 'Analysis complete. This report indicates stable vital signs.';
-                        })()
-                      )}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity 
-                    style={styles.viewFileBtn}
-                    onPress={() => handleViewFile(record.signed_url)}
-                  >
-                    <ExternalLink size={18} color={COLORS.white} />
-                    <Text style={styles.viewFileBtnText}>View Original Document</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          ))
+            ))}
+          </View>
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No documents in this folder yet.</Text>
@@ -221,86 +157,44 @@ const styles = StyleSheet.create({
     color: COLORS.text.secondary,
     fontWeight: '600',
   },
-  recordCard: {
+  // Document list (mirrors records.tsx style)
+  docsList: {
     backgroundColor: COLORS.white,
-    borderRadius: 20,
-    marginBottom: 16,
+    borderRadius: 24,
+    paddingVertical: 8,
     ...SHADOWS.soft,
-    overflow: 'hidden',
   },
-  recordHeader: {
+  docItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
-  recordIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+  docItemLast: {
+    borderBottomWidth: 0,
+  },
+  docIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
-  recordMainInfo: {
+  docInfo: {
     flex: 1,
   },
-  recordTitle: {
+  docTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text.primary,
   },
-  recordDate: {
+  docMeta: {
     fontSize: 12,
     color: COLORS.text.secondary,
     marginTop: 2,
-  },
-  recordDetails: {
-    padding: 16,
-    paddingTop: 0,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginBottom: 16,
-  },
-  summarySection: {
-    backgroundColor: '#F8FAFA',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  summaryTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summaryText: {
-    fontSize: 14,
-    color: COLORS.text.primary,
-    lineHeight: 20,
-  },
-  viewFileBtn: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  viewFileBtnText: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
   },
   centered: {
     flex: 1,
