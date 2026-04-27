@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, ArrowLeft, ExternalLink, FileText, Pill, RefreshCw, Sparkles } from 'lucide-react-native';
 import { COLORS, ROUNDING, SHADOWS, SPACING } from '../../constants/theme';
 import { Card } from '../../components/common/Card';
-import { recordService } from '../../services/api';
+import { recordService, qrService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const POLL_INTERVAL_MS = 4000;   // how often to re-check (ms)
@@ -29,6 +29,7 @@ export default function AISummaryScreen() {
   const [isPolling, setIsPolling] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const [pollingGaveUp, setPollingGaveUp] = useState(false);
+  const [isOpeningDoc, setIsOpeningDoc] = useState(false);
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -109,6 +110,39 @@ export default function AISummaryScreen() {
     setPollingGaveUp(false);
     setPollCount(0);
     await fetchRecord(false);
+  };
+
+  // ── Secure Document Viewing (Workaround for Private Buckets) ────────────────
+  const handleViewDocument = async () => {
+    if (!record) return;
+
+    if (record.signed_url) {
+      Linking.openURL(record.signed_url);
+      return;
+    }
+
+    try {
+      setIsOpeningDoc(true);
+      // Generate a temporary QR token just for this record to securely get a signed URL
+      const { token } = await qrService.generateQR([record.id]);
+      const qrData = await qrService.getQRData(token);
+      
+      const secureRecord = qrData.records?.find((r: any) => r.id === record.id);
+      
+      // The QR endpoint seamlessly replaces the public file_url with a signed URL!
+      if (secureRecord && secureRecord.file_url) {
+        Linking.openURL(secureRecord.file_url);
+      } else if (record.file_url) {
+        Linking.openURL(record.file_url);
+      }
+    } catch (error) {
+      console.error("Error generating secure link:", error);
+      if (record.file_url) {
+        Linking.openURL(record.file_url);
+      }
+    } finally {
+      setIsOpeningDoc(false);
+    }
   };
 
   // ── Loading state ───────────────────────────────────────────────────────────
@@ -305,14 +339,18 @@ export default function AISummaryScreen() {
         {record && (record.signed_url || record.file_url) && (
           <TouchableOpacity
             style={styles.viewFileBtn}
-            onPress={() => {
-              const url = record.signed_url || record.file_url;
-              if (url) Linking.openURL(url);
-            }}
+            onPress={handleViewDocument}
             activeOpacity={0.8}
+            disabled={isOpeningDoc}
           >
-            <ExternalLink size={18} color={COLORS.white} />
-            <Text style={styles.viewFileBtnText}>View Original Document</Text>
+            {isOpeningDoc ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <ExternalLink size={18} color={COLORS.white} />
+            )}
+            <Text style={styles.viewFileBtnText}>
+              {isOpeningDoc ? "Opening Securely..." : "View Original Document"}
+            </Text>
           </TouchableOpacity>
         )}
 
