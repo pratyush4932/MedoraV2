@@ -50,7 +50,7 @@ export default function RecordsScreen() {
       recordsData.records_view?.folders.forEach((f: any) => {
         allDocs = [...allDocs, ...f.records];
       });
-      allDocs.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
+      allDocs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setRecentDocs(allDocs.slice(0, 5));
     } catch (err) {
       console.error('Fetch records error', err);

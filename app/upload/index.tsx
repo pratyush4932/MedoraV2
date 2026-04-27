@@ -1,12 +1,16 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
-import { AlertCircle, CheckCircle2, FileUp, Folder, FolderPlus, Sparkles, X } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Clock, FileUp, Folder, FolderPlus, Sparkles, X } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Button } from '../../components/common/Button';
 import { COLORS, ROUNDING, SHADOWS, SPACING } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
-import { recordService } from '../../services/api';
+import { aiService, recordService } from '../../services/api';
+
+// Maximum number of /ai/status polls before giving up and proceeding anyway
+const MAX_POLL_ATTEMPTS = 30; // 30 × 3s = 90 seconds max wait
+const POLL_INTERVAL_MS = 3000;
 
 export default function UploadScreen() {
   const { user } = useAuth();
@@ -17,6 +21,7 @@ export default function UploadScreen() {
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [detectedTitle, setDetectedTitle] = useState<string | null>(null);
+  const [aiStatusText, setAiStatusText] = useState('Analyzing with Medora AI...');
   const router = useRouter();
 
   // Folder State
@@ -25,10 +30,16 @@ export default function UploadScreen() {
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
+  // Polling ref so we can cancel on unmount
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (user) {
       recordService.getUserFolders().then(setFolders);
     }
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
   }, [user]);
 
   const handlePickFile = async () => {
@@ -47,6 +58,61 @@ export default function UploadScreen() {
     }
   };
 
+  /**
+   * Polls /ai/status/:jobId until the job is completed/failed or we hit MAX_POLL_ATTEMPTS.
+   * Returns the final AI summary data object, or null if unavailable.
+   */
+  const pollJobUntilDone = (jobId: string): Promise<any | null> => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+
+      const doPoll = async () => {
+        try {
+          attempts++;
+          const statusRes = await aiService.getJobStatus(jobId);
+          console.log(`[Poll attempt ${attempts}] state:`, statusRes.state);
+
+          if (statusRes.state === 'completed') {
+            setAiStatusText('AI analysis complete!');
+            resolve(statusRes.data ?? null);
+            return;
+          }
+
+          if (statusRes.state === 'failed') {
+            console.warn('[Poll] AI job failed:', statusRes.error);
+            setAiStatusText('AI analysis unavailable for this file.');
+            resolve(null);
+            return;
+          }
+
+          if (attempts >= MAX_POLL_ATTEMPTS) {
+            console.warn('[Poll] Reached max attempts, giving up.');
+            setAiStatusText('AI is still processing — check back soon.');
+            resolve(null);
+            return;
+          }
+
+          // still pending/processing — update status text and reschedule
+          setAiStatusText(
+            statusRes.state === 'processing'
+              ? 'Extracting medical data...'
+              : 'Queued for AI analysis...'
+          );
+          pollTimerRef.current = setTimeout(doPoll, POLL_INTERVAL_MS);
+        } catch (err) {
+          console.error('[Poll] Error checking AI status:', err);
+          if (attempts >= MAX_POLL_ATTEMPTS) {
+            resolve(null);
+          } else {
+            pollTimerRef.current = setTimeout(doPoll, POLL_INTERVAL_MS);
+          }
+        }
+      };
+
+      doPoll();
+    });
+  };
+
   const handleUpload = async () => {
     if (!file || !user) return;
 
@@ -55,9 +121,14 @@ export default function UploadScreen() {
         Alert.alert('Error', 'Please enter a folder name.');
         return;
       }
-      const existingFolder = folders.find(f => f.name.toLowerCase() === newFolderName.trim().toLowerCase());
+      const existingFolder = folders.find(
+        (f) => f.name.toLowerCase() === newFolderName.trim().toLowerCase()
+      );
       if (existingFolder) {
-        Alert.alert('Folder Exists', `A folder named "${existingFolder.name}" already exists. Please select it from the existing folders or choose a different name.`);
+        Alert.alert(
+          'Folder Exists',
+          `A folder named "${existingFolder.name}" already exists. Please select it from the existing folders or choose a different name.`
+        );
         return;
       }
     } else if (!selectedFolderId) {
@@ -68,51 +139,90 @@ export default function UploadScreen() {
     setIsUploading(true);
     setStatus('idle');
     setErrorMessage('');
-    setUploadProgress(0.2);
+    setUploadProgress(0.1);
 
     try {
+      // ── Step 1: Create folder if needed ──────────────────────────
       let finalFolderId = selectedFolderId;
-
       if (isNewFolder) {
         const folderResponse = await recordService.createFolder(newFolderName);
         finalFolderId = folderResponse.folder?.id || folderResponse.id;
         if (!finalFolderId) throw new Error('Failed to create folder');
       }
+      setUploadProgress(0.2);
 
-      // Prepare Upload Data
+      // ── Step 2: Upload the record to /records/upload ──────────────
       const uploadFormData = new FormData();
-      // @ts-ignore
+      // @ts-ignore — React Native FormData accepts this shape
       uploadFormData.append('file', {
         uri: file.uri,
         name: file.name,
         type: file.mimeType || 'application/pdf',
       });
-
       if (finalFolderId) {
         uploadFormData.append('folder_id', finalFolderId);
       }
-
       uploadFormData.append('visit_date', new Date().toISOString());
       uploadFormData.append('record_name', file.name);
 
-      console.log("[Upload] Sending record to backend...");
-      
-      setStatus('idle');
-      setIsUploading(true);
+      console.log('[Upload] Sending record to backend...');
+      const uploadResponse = await recordService.uploadRecord(uploadFormData);
+      console.log('[Upload] Response:', JSON.stringify(uploadResponse));
       setUploadProgress(0.5);
+      setIsUploading(false);
 
-      const response = await recordService.uploadRecord(uploadFormData);
-      console.log('[Upload] Response:', JSON.stringify(response));
+      // ── Step 3: Send file to /ai/summarize to get a jobId ─────────
+      // The backend also queues AI internally after /records/upload,
+      // but calling /ai/summarize gives us a jobId we can poll in real-time.
+      setIsProcessingAI(true);
+      setAiStatusText('Sending to Medora AI...');
+      setUploadProgress(0.6);
+
+      const aiFormData = new FormData();
+      // @ts-ignore
+      aiFormData.append('documents', {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType || 'application/pdf',
+      });
+
+      let jobId: string | null = null;
+      try {
+        const aiResponse = await recordService.summarize(aiFormData);
+        console.log('[AI Summarize] Response:', JSON.stringify(aiResponse));
+
+        // Response: { success: true, data: [{ fileName, success, jobId }] }
+        if (aiResponse?.data?.[0]?.jobId) {
+          jobId = aiResponse.data[0].jobId;
+        } else if (aiResponse?.data?.[0]?.fromCache) {
+          // Cache hit — summary already available; no polling needed
+          setAiStatusText('AI analysis complete (from cache)!');
+          setDetectedTitle(aiResponse.data[0]?.reports?.[0] || file.name);
+          setUploadProgress(1);
+          setIsProcessingAI(false);
+          setStatus('success');
+          setTimeout(() => router.replace('/(tabs)/records'), 2000);
+          return;
+        }
+      } catch (aiErr: any) {
+        console.warn('[AI Summarize] Failed to get jobId:', aiErr?.message);
+        // Non-fatal: backend already queued the job internally via /records/upload
+      }
+
+      // ── Step 4: Poll for completion ───────────────────────────────
+      if (jobId) {
+        setUploadProgress(0.7);
+        await pollJobUntilDone(jobId);
+      } else {
+        setAiStatusText('AI is processing in the background...');
+      }
 
       setUploadProgress(1);
-      setIsUploading(false);
+      setIsProcessingAI(false);
       setStatus('success');
       setDetectedTitle(file.name);
 
-      setTimeout(() => {
-        router.replace('/(tabs)/records');
-      }, 2000);
-
+      setTimeout(() => router.replace('/(tabs)/records'), 2000);
     } catch (err: any) {
       console.error('Upload error', err);
       let errorMsg = 'Upload Failed. Try again.';
@@ -125,6 +235,7 @@ export default function UploadScreen() {
       setStatus('error');
       setIsUploading(false);
       setIsProcessingAI(false);
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     }
   };
 
@@ -195,13 +306,15 @@ export default function UploadScreen() {
               <View style={styles.foldersList}>
                 {folders.length > 0 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.foldersScroll}>
-                    {folders.map(f => (
+                    {folders.map((f) => (
                       <TouchableOpacity
                         key={f.id}
                         style={[styles.folderTag, selectedFolderId === f.id && styles.folderTagActive]}
                         onPress={() => setSelectedFolderId(f.id)}
                       >
-                        <Text style={[styles.folderTagText, selectedFolderId === f.id && styles.folderTagTextActive]}>{f.name}</Text>
+                        <Text style={[styles.folderTagText, selectedFolderId === f.id && styles.folderTagTextActive]}>
+                          {f.name}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
@@ -213,25 +326,33 @@ export default function UploadScreen() {
           </View>
         )}
 
+        {/* Progress bar — shown during upload and AI processing */}
         {(isUploading || isProcessingAI) && (
           <View style={styles.progressContainer}>
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${uploadProgress * 100}%` }]} />
+              <View style={[styles.progressBarFill, { width: `${Math.round(uploadProgress * 100)}%` }]} />
             </View>
-            <Text style={styles.progressText}>
-              {isUploading ? `Uploading... ${Math.round(uploadProgress * 100)}%` : 'Analyzing with Medora AI...'}
-            </Text>
+            <View style={styles.progressLabelRow}>
+              {isProcessingAI && <Sparkles size={14} color={COLORS.primary} />}
+              {isUploading && <Clock size={14} color={COLORS.primary} />}
+              <Text style={styles.progressText}>
+                {isUploading
+                  ? `Uploading... ${Math.round(uploadProgress * 100)}%`
+                  : aiStatusText}
+              </Text>
+            </View>
           </View>
         )}
 
         {status === 'success' && (
           <View style={styles.successBox}>
             <CheckCircle2 size={32} color={COLORS.success} />
-            <Text style={styles.successTitle}>Analysis Complete!</Text>
+            <Text style={styles.successTitle}>Upload Complete!</Text>
             <View style={styles.detectedNameCard}>
               <Sparkles size={20} color={COLORS.primary} />
               <Text style={styles.detectedNameText}>{detectedTitle || 'Medical Record'}</Text>
             </View>
+            <Text style={styles.successSubtitle}>AI summary will appear shortly in your records.</Text>
           </View>
         )}
 
@@ -246,18 +367,19 @@ export default function UploadScreen() {
 
         <View style={styles.footer}>
           <Button
-            title={isProcessingAI ? "Analyzing..." : "Upload & Analyze"}
+            title={isUploading ? 'Uploading...' : isProcessingAI ? 'Analyzing...' : 'Upload & Analyze'}
             onPress={handleUpload}
             isLoading={isUploading || isProcessingAI}
-            disabled={!file || status === 'success' || isProcessingAI || (isNewFolder ? !newFolderName.trim() : !selectedFolderId)}
+            disabled={
+              !file ||
+              status === 'success' ||
+              isProcessingAI ||
+              (isNewFolder ? !newFolderName.trim() : !selectedFolderId)
+            }
             style={styles.uploadBtn}
           />
           {!isUploading && !isProcessingAI && (
-            <Button
-              title="Cancel"
-              onPress={() => router.back()}
-              variant="ghost"
-            />
+            <Button title="Cancel" onPress={() => router.back()} variant="ghost" />
           )}
         </View>
       </ScrollView>
@@ -434,6 +556,7 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     marginTop: SPACING.xl,
+    gap: SPACING.sm,
   },
   progressBarBg: {
     height: 10,
@@ -445,11 +568,16 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: COLORS.primary,
   },
+  progressLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   progressText: {
     fontSize: 13,
     color: COLORS.primary,
     fontWeight: '700',
-    marginTop: SPACING.sm,
     textAlign: 'center',
   },
   successBox: {
@@ -465,6 +593,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.success,
     marginTop: 12,
+  },
+  successSubtitle: {
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    marginTop: 8,
+    textAlign: 'center',
   },
   detectedNameCard: {
     flexDirection: 'row',
