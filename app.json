@@ -1,25 +1,23 @@
 {
   "expo": {
-    "name": "MedoraV2",
-    "slug": "MedoraV2",
+    "name": "Medora",
+    "slug": "medora-patient",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "medorav2",
-    "userInterfaceStyle": "automatic",
+    "scheme": "medora",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#F8FAFA",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.medora.patient",
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "output": "static",
