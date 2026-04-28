@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TextInput, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ShieldCheck, ArrowRight, ArrowLeft, Lock } from 'lucide-react-native';
@@ -49,8 +49,8 @@ export default function OTPScreen() {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.inner}>
               <View style={styles.card}>
-                <TouchableOpacity 
-                  style={styles.backButton} 
+                <TouchableOpacity
+                  style={styles.backButton}
                   onPress={() => {
                     if (router.canGoBack()) {
                       router.back();
@@ -64,9 +64,10 @@ export default function OTPScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.header}>
-                  <View style={styles.iconBox}>
-                    <ShieldCheck size={20} color={COLORS.primary} fill={COLORS.primary} />
-                  </View>
+                  <Image
+                    source={require('../../assets/images/logo.png')}
+                    style={{ width: 48, height: 48, borderRadius: 16 }}
+                  />
                 </View>
 
                 <Text style={styles.title}>Verify OTP</Text>
@@ -81,7 +82,7 @@ export default function OTPScreen() {
                       style={styles.textInput}
                       value={otp}
                       onChangeText={setOtp}
-                      placeholder="000000"
+                      placeholder="Ex:000000"
                       placeholderTextColor={COLORS.text.secondary + '80'}
                       keyboardType="numeric"
                       maxLength={6}
@@ -91,8 +92,8 @@ export default function OTPScreen() {
                   {error ? <Text style={styles.errorText}>{error}</Text> : null}
                 </View>
 
-                <TouchableOpacity 
-                  style={[styles.sendButton, isLoading && styles.disabledButton]} 
+                <TouchableOpacity
+                  style={[styles.sendButton, isLoading && styles.disabledButton]}
                   onPress={handleVerifyOTP}
                   disabled={isLoading}
                   activeOpacity={0.9}
@@ -103,7 +104,7 @@ export default function OTPScreen() {
                   </View>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => authService.sendOTP(phone as string)}
                   activeOpacity={0.7}
                 >

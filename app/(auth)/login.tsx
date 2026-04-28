@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TextInput, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { BriefcaseMedical, Globe, ArrowRight, Lock, User } from 'lucide-react-native';
@@ -56,9 +56,10 @@ export default function LoginScreen() {
             <View style={styles.inner}>
               <View style={styles.card}>
                 <View style={styles.header}>
-                  <View style={styles.iconBox}>
-                    <BriefcaseMedical size={20} color={COLORS.primary} fill={COLORS.primary} />
-                  </View>
+                  <Image 
+                    source={require('../../assets/images/logo.png')} 
+                    style={{ width: 48, height: 48, borderRadius: 16 }} 
+                  />
                 </View>
 
                 <Text style={styles.title}>Welcome to{"\n"}Medora</Text>

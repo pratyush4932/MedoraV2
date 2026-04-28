@@ -2,8 +2,8 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import { BackHandler } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { BackHandler, View, Image, ActivityIndicator, Animated } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -17,6 +17,26 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!fontsLoaded || isLoading) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1.1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [fontsLoaded, isLoading, scaleAnim]);
 
   useEffect(() => {
     if (!fontsLoaded || isLoading) return;
@@ -56,7 +76,16 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   }, []);
 
   if (!fontsLoaded || isLoading) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFA' }}>
+        <Animated.Image 
+          source={require('../assets/images/logo.png')} 
+          style={{ width: 120, height: 120, borderRadius: 24, transform: [{ scale: scaleAnim }] }} 
+          resizeMode="contain"
+        />
+        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 24 }} />
+      </View>
+    );
   }
 
   return (

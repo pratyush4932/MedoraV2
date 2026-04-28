@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
@@ -11,14 +11,15 @@ import {
   FileText,
   Sparkles,
   Upload,
-  Hospital
+  Hospital,
+  LogOut
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { recordService, aiService } from '../../services/api';
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const [aiInsight, setAiInsight] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -87,9 +88,10 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.logoCircle}>
-            <FileText size={20} color={COLORS.white} fill={COLORS.white} />
-          </View>
+          <Image 
+            source={require('../../assets/images/logo.png')} 
+            style={{ width: 32, height: 32, borderRadius: 8 }} 
+          />
           <Text style={styles.brandName}>Medora</Text>
         </View>
         <TouchableOpacity style={styles.notificationBtn}>
@@ -102,9 +104,14 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroSection}>
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.userName}>{user?.name || 'Prithwi'}</Text>
+        <View style={[styles.heroSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View>
+            <Text style={styles.welcomeText}>Welcome back,</Text>
+            <Text style={styles.userName}>{user?.name || 'Prithwi'}</Text>
+          </View>
+          <TouchableOpacity onPress={signOut} style={{ padding: 8 }}>
+            <LogOut size={24} color={COLORS.primary} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.searchContainer}>
