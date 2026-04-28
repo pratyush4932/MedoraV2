@@ -23,7 +23,8 @@ import {
   Clock,
   Plus,
   X,
-  FolderOpen
+  FolderOpen,
+  Trash2
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -119,6 +120,52 @@ export default function RecordsScreen() {
     }
   };
 
+  const handleDeleteFolder = (folderId: string, folderName: string) => {
+    Alert.alert(
+      'Delete Folder',
+      `Are you sure you want to delete "${folderName}" and all its contents? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await recordService.deleteFolder(folderId);
+              fetchData(true);
+            } catch (error) {
+              console.error('Delete folder error', error);
+              Alert.alert('Error', 'Failed to delete folder.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteRecord = (recordId: string, recordName: string) => {
+    Alert.alert(
+      'Delete Record',
+      `Are you sure you want to delete "${recordName}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await recordService.deleteRecord(recordId);
+              fetchData(true);
+            } catch (error) {
+              console.error('Delete record error', error);
+              Alert.alert('Error', 'Failed to delete record.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const formatDate = (dateStr: any) => {
     try {
       if (!dateStr) return 'Unknown Date';
@@ -193,6 +240,17 @@ export default function RecordsScreen() {
               iconBoxStyle={styles.folderIconBox}
               onPress={() => router.push(`/folder/${folder.name}`)}
               borderRadius={24}
+              iconBoxChildren={
+                <TouchableOpacity 
+                  style={styles.deleteFolderBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteFolder(folder.id, folder.name);
+                  }}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                </TouchableOpacity>
+              }
             >
               <Text style={styles.folderName} numberOfLines={1}>{folder.name || 'Untitled'}</Text>
               <Text style={styles.folderCount}>{folder.records?.length || 0} Files</Text>
@@ -234,6 +292,15 @@ export default function RecordsScreen() {
                   </Text>
                 </View>
               </View>
+              <TouchableOpacity 
+                style={styles.deleteDocBtn}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteRecord(doc.id, getDocTitle(doc));
+                }}
+              >
+                <Trash2 size={18} color="#9CA3AF" />
+              </TouchableOpacity>
               <ChevronRight size={20} color={COLORS.text.secondary} />
             </AnimatedCard>
           ))}
@@ -540,5 +607,18 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     backgroundColor: '#9CA3AF',
+  },
+  deleteFolderBtn: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FEE2E2',
+    padding: 6,
+    borderRadius: 12,
+    ...SHADOWS.soft,
+  },
+  deleteDocBtn: {
+    padding: 8,
+    marginRight: 4,
   },
 });

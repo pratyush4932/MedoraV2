@@ -127,6 +127,10 @@ export const recordService = {
     const response = await api.delete(`/records/${recordId}`);
     return response.data;
   },
+  deleteFolder: async (folderId: string) => {
+    const response = await api.delete(`/folders/${folderId}`);
+    return response.data;
+  },
   createFolder: async (name: string) => {
     const response = await api.post('/folders/create', { name });
     return response.data;

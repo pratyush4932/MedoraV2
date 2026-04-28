@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
   ArrowLeft, 
   FileText,
   ChevronRight,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { recordService } from '../../services/api';
@@ -84,6 +85,60 @@ export default function FolderDetailScreen() {
     );
   }
 
+  const handleDeleteRecord = (recordId: string, recordName: string) => {
+    Alert.alert(
+      'Delete Record',
+      `Are you sure you want to delete "${recordName}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await recordService.deleteRecord(recordId);
+              fetchFolderRecords(true);
+            } catch (error) {
+              console.error('Delete record error', error);
+              Alert.alert('Error', 'Failed to delete record.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteFolder = () => {
+    Alert.alert(
+      'Delete Folder',
+      `Are you sure you want to delete this folder and all its contents? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // We need the folder ID. For now, name is used as identifier in many places, 
+              // but the API needs the ID. We'll need to find the folder ID from the data.
+              const data = await recordService.getMyProfile();
+              const folder = data?.records_view?.folders?.find((f: any) => f.name === name);
+              if (folder?.id) {
+                await recordService.deleteFolder(folder.id);
+                router.back();
+              } else {
+                Alert.alert('Error', 'Could not find folder ID.');
+              }
+            } catch (error) {
+              console.error('Delete folder error', error);
+              Alert.alert('Error', 'Failed to delete folder.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -91,7 +146,9 @@ export default function FolderDetailScreen() {
           <ArrowLeft size={24} color={COLORS.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{name}</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity onPress={handleDeleteFolder} style={styles.deleteFolderHeaderBtn}>
+          <Trash2 size={22} color="#EF4444" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -120,6 +177,15 @@ export default function FolderDetailScreen() {
                   </Text>
                   <Text style={styles.docMeta}>{getDocDate(record)}</Text>
                 </View>
+                <TouchableOpacity 
+                  style={styles.deleteBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteRecord(record.id, getDocTitle(record));
+                  }}
+                >
+                  <Trash2 size={18} color="#9CA3AF" />
+                </TouchableOpacity>
                 <ChevronRight size={20} color={COLORS.text.secondary} />
               </AnimatedCard>
             ))}
@@ -237,5 +303,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.medium,
+  },
+  deleteBtn: {
+    padding: 8,
+    marginRight: 4,
+  },
+  deleteFolderHeaderBtn: {
+    padding: 8,
   },
 });

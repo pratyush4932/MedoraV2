@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -7,17 +7,150 @@ import {
   TouchableOpacity,
   View,
   ScrollView,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertTriangle, ArrowLeft, ExternalLink, FileText, Pill, RefreshCw, Sparkles } from 'lucide-react-native';
-import { COLORS, ROUNDING, SHADOWS, SPACING } from '../../constants/theme';
-import { Card } from '../../components/common/Card';
+import { 
+  AlertTriangle, 
+  ArrowLeft, 
+  ExternalLink, 
+  FileText, 
+  Pill, 
+  RefreshCw, 
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Activity,
+  Stethoscope,
+  Info
+} from 'lucide-react-native';
+import { COLORS, SHADOWS, SPACING } from '../../constants/theme';
 import { recordService, qrService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const POLL_INTERVAL_MS = 4000;   
 const MAX_POLL_ATTEMPTS = 20;    
+
+const SectionHeader = React.memo(({ icon: Icon, title, color }: any) => (
+  <View style={styles.sectionHeader}>
+    <Icon size={18} color={color} strokeWidth={2.5} />
+    <Text style={[styles.sectionTitle, { color }]}>{title}</Text>
+  </View>
+));
+
+const AlertCard = React.memo(({ items }: { items: string[] }) => {
+  if (!items || items.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <SectionHeader icon={AlertTriangle} title="Medical Alerts" color="#EF4444" />
+      <View style={[styles.card, styles.alertCard]}>
+        {items.map((item, index) => (
+          <View key={index} style={styles.alertItem}>
+            <View style={styles.alertDot} />
+            <Text style={styles.alertText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+const FindingsCard = React.memo(({ items }: { items: any[] }) => {
+  if (!items || items.length === 0) return null;
+  
+  return (
+    <View style={styles.section}>
+      <SectionHeader icon={Activity} title="Key Findings" color="#F59E0B" />
+      <View style={styles.card}>
+        {items.map((item, index) => (
+          <View key={index} style={styles.listItem}>
+            <View 
+              style={[
+                styles.listDot, 
+                { backgroundColor: item.type === 'warning' ? '#F59E0B' : '#10B981' }
+              ]} 
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[
+                styles.listText,
+                item.type === 'warning' && { color: '#92400E', fontWeight: '700' }
+              ]}>
+                {item.text}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+const SummaryCard = React.memo(({ text }: { text: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+  
+  const toggleExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(!expanded);
+  };
+
+  return (
+    <View style={styles.section}>
+      <SectionHeader icon={Sparkles} title="AI Summary" color={COLORS.primary} />
+      <TouchableOpacity 
+        activeOpacity={0.9} 
+        onPress={toggleExpanded} 
+        style={styles.card}
+      >
+        <Text 
+          style={styles.summaryText} 
+          numberOfLines={expanded ? undefined : 3}
+        >
+          {text}
+        </Text>
+        <View style={styles.expandButton}>
+          <Text style={styles.expandButtonText}>
+            {expanded ? "Read Less" : "Read More"}
+          </Text>
+          {expanded ? <ChevronUp size={14} color={COLORS.primary} /> : <ChevronDown size={14} color={COLORS.primary} />}
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+const ListCard = React.memo(({ icon, title, items, color }: any) => {
+  if (!items || items.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <SectionHeader icon={icon} title={title} color={color} />
+      <View style={styles.card}>
+        {items.map((item: any, index: number) => (
+          <View key={index} style={styles.listItem}>
+            <View style={[styles.listDot, { backgroundColor: color }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listText}>
+                {typeof item === 'string' ? item : (item.name || item.test_name || JSON.stringify(item))}
+              </Text>
+              {(item.dosage || item.result) && (
+                <Text style={styles.subListText}>
+                  {item.dosage || `${item.result} ${item.unit || ''}`} {item.frequency ? `• ${item.frequency}` : ''}
+                </Text>
+              )}
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+});
 
 export default function AISummaryScreen() {
   const { id } = useLocalSearchParams();
@@ -30,6 +163,8 @@ export default function AISummaryScreen() {
   const [pollCount, setPollCount] = useState(0);
   const [pollingGaveUp, setPollingGaveUp] = useState(false);
   const [isOpeningDoc, setIsOpeningDoc] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [layoutHeight, setLayoutHeight] = useState(0);
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,13 +176,11 @@ export default function AISummaryScreen() {
         const data = await recordService.getMyProfile();
         let found: any = null;
         
-        // 1. Search in personal folders
         data.records_view?.folders?.forEach((f: any) => {
           const r = f.records?.find((rec: any) => rec.id === id);
           if (r) found = r;
         });
 
-        // 2. Search in hospital visits if not found yet
         if (!found) {
           data.hospital_view?.forEach((h: any) => {
             h.visits?.forEach((v: any) => {
@@ -148,10 +281,103 @@ export default function AISummaryScreen() {
     }
   };
 
+  const processedData = useMemo(() => {
+    if (!record || !record.ai_summary) return null;
+    
+    let raw = record.ai_summary;
+    if (typeof raw === 'string' && raw.startsWith('{')) {
+      try { raw = JSON.parse(raw); } catch (e) { return null; }
+    }
+
+    const data = {
+      fileName: raw.fileName || raw.reports?.[0] || record.file_type || 'Medical Document',
+      findings: Array.isArray(raw.findings) ? raw.findings : (Array.isArray(raw.key_findings) ? raw.key_findings : []),
+      diagnosis: Array.isArray(raw.diagnosis) ? raw.diagnosis : [],
+      complaints: Array.isArray(raw.complaints) ? raw.complaints : (Array.isArray(raw.key_complaints) ? raw.key_complaints : []),
+      medications: Array.isArray(raw.medications) ? raw.medications : [],
+      simple_summary: raw.simple_summary || raw.summary || raw.findings_summary || null,
+      is_medical_document: raw.is_medical_document !== false
+    };
+
+    const getIndicator = (text: string) => {
+      const lower = text.toLowerCase();
+      if (lower.includes('elevated') || lower.includes('increased') || lower.includes('high')) return '↑';
+      if (lower.includes('decreased') || lower.includes('reduced') || lower.includes('low')) return '↓';
+      const rangeMatch = text.match(/([\d.]+)\s*.*?(?:range|normal|ref|reference).*?([\d.]+)\s*-\s*([\d.]+)/i);
+      if (rangeMatch) {
+        const val = parseFloat(rangeMatch[1]);
+        const min = parseFloat(rangeMatch[2]);
+        const max = parseFloat(rangeMatch[3]);
+        if (!isNaN(val) && !isNaN(min) && !isNaN(max)) {
+          if (val > max) return '↑';
+          if (val < min) return '↓';
+        }
+      }
+      return null;
+    };
+
+    const filteredFindings = data.findings
+      .map((f: any) => {
+        if (!f) return null;
+        
+        let text = '';
+        let indicator = null;
+        let isAbnormal = false;
+        let statusStr = '';
+
+        if (typeof f === 'string') {
+          text = f;
+          indicator = getIndicator(f);
+          isAbnormal = !!indicator;
+        } else if (typeof f === 'object') {
+          const parts = [];
+          if (f.test_name) parts.push(f.test_name);
+          if (f.result !== undefined) parts.push(`: ${f.result}`);
+          if (f.unit) parts.push(` ${f.unit}`);
+          if (f.reference_range) parts.push(` (Range: ${f.reference_range})`);
+          
+          text = parts.join('');
+          statusStr = (f.status || '').toLowerCase();
+          
+          if (statusStr.includes('high')) indicator = '↑';
+          else if (statusStr.includes('low')) indicator = '↓';
+          else if (statusStr.includes('abnormal') || statusStr.includes('borderline')) indicator = '•';
+          
+          if (!indicator) indicator = getIndicator(text);
+          isAbnormal = !!indicator;
+        } else {
+          return null;
+        }
+
+        const lower = text.toLowerCase();
+        const hasNumber = /\d/.test(text);
+        const hasMetric = /%|mm|mg\/dL|mIU\/L|mmol\/L|g\/dL|mcg|unit|L/i.test(text);
+        const hasKeywords = ["ejection fraction", "pressure", "level", "glucose", "cholesterol", "rate"].some(k => lower.includes(k));
+        
+        const isGeneric = ["normal", "no ", "intact", "within"].some(k => lower.includes(k));
+        const keep = (hasNumber || hasMetric || hasKeywords) || !isGeneric;
+
+        if (!keep) return null;
+
+        return {
+          text: indicator ? `${text} ${indicator}` : text,
+          indicator,
+          isAbnormal,
+          type: (indicator === '↑' || indicator === '↓' || statusStr.includes('high') || statusStr.includes('low') || statusStr.includes('borderline')) ? 'warning' : 'normal'
+        };
+      })
+      .filter(Boolean);
+
+    return { ...data, filteredFindings };
+  }, [record]);
+
+  const isLongContent = contentHeight > layoutHeight + 20;
+
   if (isLoading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading insights...</Text>
       </View>
     );
   }
@@ -173,13 +399,34 @@ export default function AISummaryScreen() {
     );
   }
 
-  let aiSummary = record.ai_summary;
-  if (typeof aiSummary === 'string' && aiSummary.startsWith('{')) {
-    try { aiSummary = JSON.parse(aiSummary); } catch (e) {}
-  }
+  const hasMeaningfulContent = processedData && (
+    processedData.diagnosis.length > 0 || 
+    processedData.filteredFindings.length > 0
+  );
+
+  const renderCTA = () => {
+    if (!record || (!record.signed_url && !record.file_url)) return null;
+    return (
+      <TouchableOpacity
+        style={[styles.viewFileBtn, !isLongContent && { marginTop: 32 }]}
+        onPress={handleViewDocument}
+        activeOpacity={0.8}
+        disabled={isOpeningDoc}
+      >
+        {isOpeningDoc ? (
+          <ActivityIndicator size="small" color={COLORS.white} />
+        ) : (
+          <ExternalLink size={18} color={COLORS.white} />
+        )}
+        <Text style={styles.viewFileBtnText}>
+          {isOpeningDoc ? "Opening Securely..." : "View Original Document"}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.headerNav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ArrowLeft size={24} color={COLORS.text.primary} />
@@ -188,134 +435,114 @@ export default function AISummaryScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.recordBrief}>
-          <View style={styles.iconCircle}>
-            <FileText size={32} color={COLORS.primary} />
-          </View>
-          <Text style={styles.title}>
-            {aiSummary?.fileName || aiSummary?.reports?.[0] || record.file_type || 'Medical Report'}
-          </Text>
-          <Text style={styles.subtitle}>Analyzed by Medora AI</Text>
-        </View>
-
-        {aiSummary ? (
-          aiSummary.is_medical_document === false ? (
-            <View style={styles.emptyState}>
-              <AlertTriangle size={48} color="#EF4444" />
-              <Text style={styles.emptyTitle}>Non-Medical Document Detected</Text>
-              <Text style={styles.emptyText}>
-                Please strictly upload medical documents only.{'\n'}We cannot provide a medical summary for this file.
+      <View 
+        style={{ flex: 1 }} 
+        onLayout={(e) => setLayoutHeight(e.nativeEvent.layout.height)}
+      >
+        <ScrollView 
+          contentContainerStyle={[
+            styles.scrollContent,
+            !isLongContent && { flexGrow: 1 }
+          ]} 
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={(_, h) => setContentHeight(h)}
+        >
+          <View style={styles.recordBrief}>
+            <View style={styles.fileNameRow}>
+              <FileText size={20} color={COLORS.text.primary} strokeWidth={2} />
+              <Text style={styles.fileName} numberOfLines={1}>
+                {processedData?.fileName || 'Medical Report'}
               </Text>
             </View>
-          ) : (
-          <>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Sparkles size={20} color={COLORS.primary} />
-                <Text style={styles.sectionTitle}>AI Summary</Text>
-              </View>
-              <Card style={styles.summaryCard}>
-                <Text style={styles.summaryText}>
-                  {aiSummary.simple_summary || 'Analysis complete. No significant findings detected.'}
-                </Text>
-
-                {aiSummary.findings?.length > 0 && (
-                  <View style={styles.findingsList}>
-                    {aiSummary.findings.map((item: any, index: number) => (
-                      <View key={index} style={styles.listItem}>
-                        <View style={styles.listDot} />
-                        <Text style={styles.listText}>{typeof item === 'string' ? item : JSON.stringify(item)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </Card>
+            <View style={styles.tag}>
+              <Sparkles size={12} color={COLORS.primary} fill={COLORS.primary} />
+              <Text style={styles.tagText}>AI ANALYZED</Text>
             </View>
+          </View>
 
-            {aiSummary.medications?.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Pill size={20} color={COLORS.primary} />
-                  <Text style={styles.sectionTitle}>Medications Detected</Text>
-                </View>
-                <Card style={styles.summaryCard}>
-                  {aiSummary.medications.map((item: any, index: number) => (
-                    <View key={index} style={styles.listItem}>
-                      <View style={styles.listDot} />
-                      <View>
-                        <Text style={styles.medName}>
-                          {typeof item === 'string' ? item : item.name}
-                        </Text>
-                        {item.dosage && (
-                          <Text style={styles.medDetails}>
-                            {item.dosage} • {item.frequency}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  ))}
-                </Card>
+          {processedData ? (
+            processedData.is_medical_document === false ? (
+              <View style={styles.emptyStateContainer}>
+                <Info size={48} color={COLORS.border} />
+                <Text style={styles.emptyTitle}>This file does not appear to be a medical report</Text>
               </View>
-            )}
-          </>
-          )
-        ) : (
-          <View style={styles.emptyState}>
-            {isPolling ? (
-              <>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.emptyTitle}>Medora AI is analysing…</Text>
-                <Text style={styles.emptyText}>
-                  This usually takes 10–30 seconds.{'\n'}The page will update automatically.
-                </Text>
-              </>
-            ) : pollingGaveUp ? (
-              <>
-                <Sparkles size={48} color={COLORS.border} />
-                <Text style={styles.emptyTitle}>Still processing…</Text>
-                <Text style={styles.emptyText}>
-                  The AI is taking longer than expected.{'\n'}Please check back in a moment.
-                </Text>
-                <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
-                  <RefreshCw size={16} color={COLORS.white} />
-                  <Text style={styles.refreshBtnText}>Check Again</Text>
-                </TouchableOpacity>
-              </>
+            ) : !hasMeaningfulContent ? (
+              <View style={styles.emptyStateContainer}>
+                <Info size={48} color={COLORS.border} />
+                <Text style={styles.emptyTitle}>No meaningful medical insights found</Text>
+                <Text style={styles.emptyText}>The analysis could not identify critical alerts or key findings in this document.</Text>
+              </View>
             ) : (
-              <>
-                <Sparkles size={48} color={COLORS.border} />
-                <Text style={styles.emptyTitle}>AI analysis pending</Text>
-                <Text style={styles.emptyText}>Loading your record…</Text>
-              </>
-            )}
+              <View style={[styles.mainContent, !isLongContent && { flex: 1 }]}>
+                {/* 1. AI Summary (Top) */}
+                <SummaryCard text={processedData.simple_summary} />
+
+                {/* 2. Medical Alerts (Diagnosis) */}
+                <AlertCard items={processedData.diagnosis} />
+
+                {/* 3. Medications */}
+                <ListCard 
+                  icon={Pill} 
+                  title="Medications" 
+                  items={processedData.medications} 
+                  color={COLORS.primary} 
+                />
+
+                {/* 4. Symptoms & Complaints */}
+                <ListCard 
+                  icon={Stethoscope} 
+                  title="Symptoms & Complaints" 
+                  items={processedData.complaints} 
+                  color="#22C55E" 
+                />
+
+                {/* 5. Key Findings (Last) */}
+                <FindingsCard items={processedData.filteredFindings} />
+
+                {!isLongContent && <View style={{ flex: 1 }} />}
+                {!isLongContent && renderCTA()}
+              </View>
+            )
+          ) : (
+            <View style={styles.emptyState}>
+              {isPolling ? (
+                <>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                  <Text style={styles.emptyTitle}>Medora AI is analyzing…</Text>
+                  <Text style={styles.emptyText}>
+                    This usually takes 10–30 seconds.{'\n'}The page will update automatically.
+                  </Text>
+                </>
+              ) : pollingGaveUp ? (
+                <>
+                  <Sparkles size={48} color={COLORS.border} />
+                  <Text style={styles.emptyTitle}>Still processing…</Text>
+                  <Text style={styles.emptyText}>
+                    The AI is taking longer than expected.{'\n'}Please check back in a moment.
+                  </Text>
+                  <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
+                    <RefreshCw size={16} color={COLORS.white} />
+                    <Text style={styles.refreshBtnText}>Check Again</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={48} color={COLORS.border} />
+                  <Text style={styles.emptyTitle}>AI analysis pending</Text>
+                  <Text style={styles.emptyText}>Loading your record…</Text>
+                </>
+              )}
+            </View>
+          )}
+        </ScrollView>
+
+        {isLongContent && (
+          <View style={styles.stickyCTAContainer}>
+            {renderCTA()}
           </View>
         )}
+      </View>
 
-        {record && (record.signed_url || record.file_url) && (
-          <TouchableOpacity
-            style={styles.viewFileBtn}
-            onPress={handleViewDocument}
-            activeOpacity={0.8}
-            disabled={isOpeningDoc}
-          >
-            {isOpeningDoc ? (
-              <ActivityIndicator size="small" color={COLORS.white} />
-            ) : (
-              <ExternalLink size={18} color={COLORS.white} />
-            )}
-            <Text style={styles.viewFileBtnText}>
-              {isOpeningDoc ? "Opening Securely..." : "View Original Document"}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={styles.disclaimer}>
-          <Text style={styles.disclaimerText}>
-            Note: This summary is AI-generated and should be verified by a medical professional.
-          </Text>
-        </View>
-      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -323,11 +550,7 @@ export default function AISummaryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    padding: SPACING.lg,
-    paddingBottom: 40,
+    backgroundColor: '#FFFFFF',
   },
   headerNav: {
     flexDirection: 'row',
@@ -335,123 +558,182 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white,
-    ...SHADOWS.soft,
+    backgroundColor: '#FFFFFF',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.text.primary,
   },
   backBtn: {
     padding: 8,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text.primary,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   recordBrief: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.xl,
-    marginTop: SPACING.md,
+    marginTop: 20,
+    marginBottom: 24,
   },
-  iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: ROUNDING.full,
-    backgroundColor: COLORS.white,
+  fileNameRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
-    ...SHADOWS.soft,
+    gap: 8,
+    flex: 1,
+    marginRight: 12,
   },
-  title: {
-    fontSize: 22,
+  fileName: {
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.text.primary,
-    textAlign: 'center',
   },
-  subtitle: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
-    marginTop: 4,
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '15',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  tagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 0.5,
+  },
+  mainContent: {
+    gap: 12,
   },
   section: {
-    marginBottom: SPACING.lg,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
+    gap: 8,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.text.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
-  summaryCard: {
-    padding: SPACING.md,
-    backgroundColor: COLORS.white,
+  card: {
+    backgroundColor: '#F5F7FA',
+    borderRadius: 20,
+    padding: 20,
+    ...SHADOWS.soft,
+  },
+  alertCard: {
+    backgroundColor: '#FEF2F2',
+  },
+  alertItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 8,
+  },
+  alertDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
+    marginTop: 8,
+  },
+  alertText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#991B1B',
+    lineHeight: 22,
+    flex: 1,
   },
   summaryText: {
     fontSize: 15,
-    color: COLORS.text.primary,
+    color: '#374151',
     lineHeight: 24,
-    marginBottom: 12,
   },
-  findingsList: {
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 12,
+  },
+  expandButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   listItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
+    gap: 12,
+    marginBottom: 12,
   },
   listDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: COLORS.primary,
     marginTop: 8,
   },
   listText: {
-    fontSize: 14,
-    color: COLORS.text.primary,
-    lineHeight: 20,
-    flex: 1,
-  },
-  medName: {
     fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.text.primary,
+    fontWeight: '600',
+    color: '#1F2937',
+    lineHeight: 22,
   },
-  medDetails: {
+  subListText: {
     fontSize: 13,
-    color: COLORS.text.secondary,
+    color: '#6B7280',
     marginTop: 2,
+  },
+  viewFileBtn: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.primary,
+    borderRadius: 18,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    ...SHADOWS.medium,
+  },
+  viewFileBtnText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
     gap: 16,
-    paddingHorizontal: SPACING.lg,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    gap: 16,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.text.primary,
+    color: '#374151',
     textAlign: 'center',
   },
   emptyText: {
     fontSize: 14,
-    color: COLORS.text.secondary,
-    fontWeight: '500',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 12,
   },
   refreshBtn: {
     flexDirection: 'row',
@@ -460,7 +742,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: ROUNDING.lg,
+    borderRadius: 12,
     marginTop: 8,
   },
   refreshBtnText: {
@@ -468,39 +750,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.white,
   },
-  disclaimer: {
-    marginTop: SPACING.xl,
-    padding: SPACING.md,
-    backgroundColor: '#F3F4F6',
-    borderRadius: ROUNDING.md,
-  },
-  disclaimerText: {
-    fontSize: 12,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
-    gap: 16,
+    backgroundColor: '#FFFFFF',
   },
-  viewFileBtn: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.primary,
-    borderRadius: ROUNDING.lg,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.lg,
-  },
-  viewFileBtnText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '700',
+  stickyCTAContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 10,
   },
 });
