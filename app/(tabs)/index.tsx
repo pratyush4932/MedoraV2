@@ -318,16 +318,39 @@ export default function HomeScreen() {
             <View style={styles.insightIconCircle}>
               <Sparkles size={18} color={COLORS.primary} />
             </View>
-            <Text style={styles.insightType}>AI ANALYSIS</Text>
+            <View style={styles.insightHeaderText}>
+              <Text style={styles.insightType}>AI ANALYSIS</Text>
+              <Text style={styles.insightUpdateStatus}>Updated just now</Text>
+            </View>
           </View>
+          
           <Text style={styles.insightTitle}>
             {aiInsight ? 'Longitudinal Health Overview' : 'All systems look good'}
           </Text>
+          
           <Text style={styles.insightDescription}>
             {aiInsight?.overall_health_picture || 'Based on your recent records, your vital signs are within normal ranges.'}
           </Text>
+
+          {aiInsight?.identified_patterns && aiInsight.identified_patterns.length > 0 && (
+            <View style={styles.patternsContainer}>
+              <Text style={styles.patternsLabel}>Key Observations:</Text>
+              <View style={styles.patternsGrid}>
+                {aiInsight.identified_patterns.map((pattern: string, idx: number) => (
+                  <View key={idx} style={styles.patternChip}>
+                    <View style={styles.patternDot} />
+                    <Text style={styles.patternText}>{pattern}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           {isLoading && !isRefreshing && (
-             <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 12 }} />
+             <View style={styles.insightLoading}>
+               <ActivityIndicator size="small" color={COLORS.primary} />
+               <Text style={styles.insightLoadingText}>Analyzing records...</Text>
+             </View>
           )}
         </View>
         </>
@@ -467,17 +490,22 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.xl,
     ...SHADOWS.soft,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
   insightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 16,
+  },
+  insightHeaderText: {
+    flex: 1,
   },
   insightIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     backgroundColor: COLORS.primary + '10',
     alignItems: 'center',
     justifyContent: 'center',
@@ -485,19 +513,72 @@ const styles = StyleSheet.create({
   insightType: {
     fontSize: 10,
     fontWeight: '800',
-    color: COLORS.text.secondary,
+    color: COLORS.primary,
     letterSpacing: 1,
+  },
+  insightUpdateStatus: {
+    fontSize: 10,
+    color: COLORS.text.secondary,
+    marginTop: 2,
   },
   insightTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text.primary,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   insightDescription: {
     fontSize: 14,
     color: COLORS.text.secondary,
-    lineHeight: 20,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  patternsContainer: {
+    marginTop: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  patternsLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginBottom: 10,
+  },
+  patternsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  patternChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  patternDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+  },
+  patternText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+  insightLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  insightLoadingText: {
+    fontSize: 12,
+    color: COLORS.text.secondary,
   },
   searchResults: {
     marginBottom: SPACING.xl,

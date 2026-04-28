@@ -134,12 +134,15 @@ export default function QRGenerateScreen() {
         }
       }
 
-      const data = await qrService.generateQR(selectedIds);
+      console.log('[QR] Generating token for record IDs:', selectedIds);
+      const data = await qrService.generateQR(selectedIds, 3600);
+      console.log('[QR] Token generated successfully:', data);
+      
       setToken(data.token);
       setExpiresAt(new Date(data.expires_at));
       setIsSelecting(false);
     } catch (e) {
-      console.error('Failed to generate QR', e);
+      console.error('[QR] Failed to generate QR:', e);
     } finally {
       setIsLoading(false);
     }

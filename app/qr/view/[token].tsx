@@ -19,11 +19,14 @@ export default function DoctorViewScreen() {
 
   const fetchQRData = async () => {
     if (!token) return;
+    console.log('[DoctorView] Fetching data for token:', token);
     setIsLoading(true);
     try {
       const response = await qrService.getQRData(token as string);
+      console.log('[DoctorView] Data received:', response);
       setData(response);
     } catch (e: any) {
+      console.error('[DoctorView] Error fetching QR data:', e.response?.data || e.message);
       setError(e.response?.data?.message || 'Access expired or invalid token');
     } finally {
       setIsLoading(false);

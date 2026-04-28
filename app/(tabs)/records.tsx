@@ -259,18 +259,17 @@ export default function RecordsScreen() {
               iconBoxStyle={styles.folderIconBox}
               onPress={() => router.push(`/folder/${folder.name}`)}
               borderRadius={24}
-              iconBoxChildren={
-                <TouchableOpacity 
-                  style={styles.deleteFolderBtn}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleDeleteFolder(folder.id, folder.name);
-                  }}
-                >
-                  <Trash2 size={16} color="#EF4444" />
-                </TouchableOpacity>
-              }
+              iconBoxChildren={null}
             >
+              <TouchableOpacity 
+                style={styles.deleteFolderBtn}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteFolder(folder.id, folder.name);
+                }}
+              >
+                <Trash2 size={16} color="#EF4444" />
+              </TouchableOpacity>
               <Text style={styles.folderName} numberOfLines={1}>{folder.name || 'Untitled'}</Text>
               <Text style={styles.folderCount}>{folder.records?.length || 0} Files</Text>
             </AnimatedCard>
@@ -486,6 +485,7 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     ...SHADOWS.soft,
+    position: 'relative',
   },
   folderIconBox: {
     width: 52,
@@ -646,12 +646,13 @@ const styles = StyleSheet.create({
   },
   deleteFolderBtn: {
     position: 'absolute',
-    top: -8,
-    right: -8,
+    top: 12,
+    right: 12,
     backgroundColor: '#FEE2E2',
     padding: 6,
-    borderRadius: 12,
+    borderRadius: 10,
     ...SHADOWS.soft,
+    zIndex: 10,
   },
   deleteDocBtn: {
     padding: 8,
