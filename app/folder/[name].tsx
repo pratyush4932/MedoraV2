@@ -5,7 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
   ArrowLeft, 
   FileText,
-  ChevronRight
+  ChevronRight,
+  Plus
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { recordService } from '../../services/api';
@@ -57,6 +58,7 @@ export default function FolderDetailScreen() {
       try { ai = JSON.parse(ai); } catch (e) {}
     }
     const reports = ai?.reports || record.reports;
+    if (ai?.fileName) return ai.fileName;
     if (reports && Array.isArray(reports) && reports.length > 0) return reports[0];
     return ai?.title || record.record_name || record.file_type || 'Medical Record';
   };
@@ -127,6 +129,13 @@ export default function FolderDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      <TouchableOpacity 
+        style={styles.fab}
+        onPress={() => router.push({ pathname: '/upload', params: { folderId: name } })}
+      >
+        <Plus size={30} color={COLORS.white} />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -215,5 +224,17 @@ const styles = StyleSheet.create({
   emptyText: {
     color: COLORS.text.secondary,
     fontSize: 16,
+  },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.medium,
   },
 });

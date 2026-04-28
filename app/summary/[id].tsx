@@ -173,7 +173,10 @@ export default function AISummaryScreen() {
     );
   }
 
-  const aiSummary = record.ai_summary;
+  let aiSummary = record.ai_summary;
+  if (typeof aiSummary === 'string' && aiSummary.startsWith('{')) {
+    try { aiSummary = JSON.parse(aiSummary); } catch (e) {}
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -191,12 +194,21 @@ export default function AISummaryScreen() {
             <FileText size={32} color={COLORS.primary} />
           </View>
           <Text style={styles.title}>
-            {aiSummary?.reports?.[0] || record.file_type || 'Medical Report'}
+            {aiSummary?.fileName || aiSummary?.reports?.[0] || record.file_type || 'Medical Report'}
           </Text>
           <Text style={styles.subtitle}>Analyzed by Medora AI</Text>
         </View>
 
         {aiSummary ? (
+          aiSummary.is_medical_document === false ? (
+            <View style={styles.emptyState}>
+              <AlertTriangle size={48} color="#EF4444" />
+              <Text style={styles.emptyTitle}>Non-Medical Document Detected</Text>
+              <Text style={styles.emptyText}>
+                Please strictly upload medical documents only.{'\n'}We cannot provide a medical summary for this file.
+              </Text>
+            </View>
+          ) : (
           <>
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -205,17 +217,15 @@ export default function AISummaryScreen() {
               </View>
               <Card style={styles.summaryCard}>
                 <Text style={styles.summaryText}>
-                  {aiSummary.simple_summary ||
-                    aiSummary.findings ||
-                    'Analysis complete. No significant findings detected.'}
+                  {aiSummary.simple_summary || 'Analysis complete. No significant findings detected.'}
                 </Text>
 
-                {aiSummary.key_findings?.length > 0 && (
+                {aiSummary.findings?.length > 0 && (
                   <View style={styles.findingsList}>
-                    {aiSummary.key_findings.map((item: any, index: number) => (
+                    {aiSummary.findings.map((item: any, index: number) => (
                       <View key={index} style={styles.listItem}>
                         <View style={styles.listDot} />
-                        <Text style={styles.listText}>{item}</Text>
+                        <Text style={styles.listText}>{typeof item === 'string' ? item : JSON.stringify(item)}</Text>
                       </View>
                     ))}
                   </View>
@@ -249,6 +259,7 @@ export default function AISummaryScreen() {
               </View>
             )}
           </>
+          )
         ) : (
           <View style={styles.emptyState}>
             {isPolling ? (

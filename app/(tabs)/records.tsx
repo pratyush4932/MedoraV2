@@ -127,6 +127,17 @@ export default function RecordsScreen() {
     }
   };
 
+  const getDocTitle = (doc: any) => {
+    let ai = doc.ai_summary;
+    if (typeof ai === 'string' && ai.startsWith('{')) {
+      try { ai = JSON.parse(ai); } catch (e) {}
+    }
+    if (ai?.fileName) return ai.fileName;
+    const reports = ai?.reports || doc.reports;
+    if (reports && Array.isArray(reports) && reports.length > 0) return reports[0];
+    return ai?.title || doc.record_name || doc.file_type || 'Medical Report';
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -202,7 +213,7 @@ export default function RecordsScreen() {
               </View>
               <View style={styles.docInfo}>
                 <Text style={styles.docTitle} numberOfLines={1}>
-                  {doc.ai_summary?.reports?.[0] || doc.file_type || 'Medical Report'}
+                  {getDocTitle(doc)}
                 </Text>
                 <View style={styles.docMeta}>
                   <Clock size={12} color={COLORS.text.secondary} />
@@ -274,12 +285,6 @@ export default function RecordsScreen() {
         </View>
       </Modal>
 
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => router.push('/upload')}
-      >
-        <Plus size={30} color={COLORS.white} />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
