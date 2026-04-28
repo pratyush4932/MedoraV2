@@ -10,7 +10,9 @@ import {
   Modal, 
   TextInput, 
   Alert,
-  Platform
+  Platform,
+  Pressable,
+  Keyboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -44,6 +46,7 @@ export default function RecordsScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchData = async (silent = false) => {
     if (!user) return;
@@ -196,20 +199,28 @@ export default function RecordsScreen() {
     );
   }
 
+  const filteredFolders = folders.filter(f => f.name?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredRecentDocs = recentDocs.filter(d => getDocTitle(d).toLowerCase().includes(searchQuery.toLowerCase()));
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Medical Records</Text>
-        <TouchableOpacity style={styles.searchBtn}>
-          <Search size={22} color={COLORS.text.primary} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
+        <Pressable 
+          style={{ flex: 1, minHeight: '100%' }}
+          onPress={() => {
+            Keyboard.dismiss();
+            if (searchQuery.length > 0) setSearchQuery('');
+          }}
+        >
         <LinearGradient
           colors={[COLORS.success, COLORS.primary, COLORS.success]}
           start={{ x: 0, y: 0 }}
@@ -218,20 +229,28 @@ export default function RecordsScreen() {
         >
           <View style={styles.searchBar}>
             <Search size={20} color="#9CA3AF" />
-            <Text style={styles.searchText}>Search reports, labs, doctors...</Text>
-            <Filter size={20} color={COLORS.primary} />
+            <TextInput
+              style={styles.searchText}
+              placeholder="Search reports, labs, doctors..."
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
           </View>
         </LinearGradient>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Folders</Text>
-          <TouchableOpacity onPress={() => setIsModalVisible(true)}>
-            <Text style={styles.seeAll}>Create New</Text>
-          </TouchableOpacity>
-        </View>
+        {searchQuery.length === 0 && (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Folders</Text>
+            <TouchableOpacity onPress={() => setIsModalVisible(true)}>
+              <Text style={styles.seeAll}>Create New</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        <View style={styles.folderGrid}>
-          {folders.map((folder, index) => (
+        {(searchQuery.length > 0 ? filteredFolders.length > 0 : true) && (
+          <View style={styles.folderGrid}>
+            {filteredFolders.map((folder, index) => (
             <AnimatedCard 
               key={folder.id || index} 
               icon={Folder}
@@ -256,22 +275,31 @@ export default function RecordsScreen() {
               <Text style={styles.folderCount}>{folder.records?.length || 0} Files</Text>
             </AnimatedCard>
           ))}
-          {folders.length === 0 && (
+          {filteredFolders.length === 0 && searchQuery.length > 0 && (
+            <View style={styles.emptyContainer}>
+               <Text style={styles.emptyText}>No matching folders found.</Text>
+            </View>
+          )}
+          {folders.length === 0 && searchQuery.length === 0 && (
             <View style={styles.emptyContainer}>
                <Text style={styles.emptyText}>No folders created.</Text>
             </View>
           )}
         </View>
+        )}
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Documents</Text>
-          <TouchableOpacity onPress={() => {}}>
-            <Text style={styles.seeAll}>See All</Text>
-          </TouchableOpacity>
-        </View>
+        {searchQuery.length === 0 && (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Documents</Text>
+            <TouchableOpacity onPress={() => {}}>
+              <Text style={styles.seeAll}>See All</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        <View style={styles.docsList}>
-          {recentDocs.map((doc, index) => (
+        {(searchQuery.length > 0 ? filteredRecentDocs.length > 0 : true) && (
+          <View style={styles.docsList}>
+            {filteredRecentDocs.map((doc, index) => (
             <AnimatedCard 
               key={doc.id || index} 
               icon={FileText}
@@ -305,12 +333,19 @@ export default function RecordsScreen() {
             </AnimatedCard>
           ))}
           
-          {recentDocs.length === 0 && (
+          {filteredRecentDocs.length === 0 && searchQuery.length > 0 && (
+            <View style={styles.emptyRecent}>
+              <Text style={styles.emptyRecentText}>No matching documents found.</Text>
+            </View>
+          )}
+          {recentDocs.length === 0 && searchQuery.length === 0 && (
             <View style={styles.emptyRecent}>
               <Text style={styles.emptyRecentText}>No recent documents found.</Text>
             </View>
           )}
         </View>
+        )}
+        </Pressable>
       </ScrollView>
 
       {/* Create Folder Modal */}
@@ -400,6 +435,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: SPACING.lg,
     paddingBottom: 100,
+    flexGrow: 1,
   },
   searchGradientBorder: {
     padding: 1.5,

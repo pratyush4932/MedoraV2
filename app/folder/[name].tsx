@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   FileText,
   ChevronRight,
   Plus,
@@ -12,7 +12,6 @@ import {
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { recordService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { AnimatedCard } from '../../components/AnimatedCard';
 
 export default function FolderDetailScreen() {
   const { name } = useLocalSearchParams<{ name: string }>();
@@ -57,7 +56,7 @@ export default function FolderDetailScreen() {
     if (record.status === 'processing') return 'Generating AI summary...';
     let ai = record.ai_summary;
     if (typeof ai === 'string' && ai.startsWith('{')) {
-      try { ai = JSON.parse(ai); } catch (e) {}
+      try { ai = JSON.parse(ai); } catch (e) { }
     }
     const reports = ai?.reports || record.reports;
     if (ai?.fileName) return ai.fileName;
@@ -159,18 +158,18 @@ export default function FolderDetailScreen() {
         {records.length > 0 ? (
           <View style={styles.docsList}>
             {records.map((record, index) => (
-              <AnimatedCard
+              <TouchableOpacity
                 key={record.id || index}
-                icon={FileText}
-                iconSize={22}
                 style={[
                   styles.docItem,
                   index === records.length - 1 && styles.docItemLast,
                 ]}
-                iconBoxStyle={styles.docIconBox}
+                activeOpacity={0.7}
                 onPress={() => router.push(`/summary/${record.id}`)}
-                borderRadius={index === 0 ? 24 : index === records.length - 1 ? 24 : 0}
               >
+                <View style={styles.docIconBox}>
+                  <FileText size={22} color={COLORS.primary} />
+                </View>
                 <View style={styles.docInfo}>
                   <Text style={styles.docTitle} numberOfLines={1}>
                     {getDocTitle(record)}
@@ -187,7 +186,7 @@ export default function FolderDetailScreen() {
                   <Trash2 size={18} color="#9CA3AF" />
                 </TouchableOpacity>
                 <ChevronRight size={20} color={COLORS.text.secondary} />
-              </AnimatedCard>
+              </TouchableOpacity>
             ))}
           </View>
         ) : (
@@ -197,7 +196,7 @@ export default function FolderDetailScreen() {
         )}
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => router.push({ pathname: '/upload', params: { folderId: name } })}
       >

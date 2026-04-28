@@ -21,6 +21,24 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { qrService, recordService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const GradientSelectionCard = ({ selected, onPress, children }: any) => (
+  <LinearGradient
+    colors={selected ? [COLORS.success, COLORS.primary, COLORS.success] : [COLORS.border, COLORS.border, COLORS.border]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 0 }}
+    style={styles.selectionGradientWrapper}
+  >
+    <TouchableOpacity 
+      style={[styles.selectionItem, selected && styles.selectedItem]} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {children}
+    </TouchableOpacity>
+  </LinearGradient>
+);
 
 export default function QRGenerateScreen() {
   const { user } = useAuth();
@@ -189,8 +207,8 @@ export default function QRGenerateScreen() {
         <ScrollView style={styles.selectionList} contentContainerStyle={styles.selectionContent}>
           <Text style={styles.sectionTitle}>Presets</Text>
           
-          <TouchableOpacity 
-            style={[styles.selectionItem, selectedOption === 'all' && styles.selectedItem]} 
+          <GradientSelectionCard 
+            selected={selectedOption === 'all'} 
             onPress={() => setSelectedOption('all')}
           >
             <View style={[styles.iconBox, { backgroundColor: COLORS.primary + '10' }]}>
@@ -201,10 +219,10 @@ export default function QRGenerateScreen() {
               <Text style={styles.itemDesc}>Everything in your profile</Text>
             </View>
             {selectedOption === 'all' && <CheckCircle2 size={20} color={COLORS.primary} />}
-          </TouchableOpacity>
+          </GradientSelectionCard>
 
-          <TouchableOpacity 
-            style={[styles.selectionItem, selectedOption === 'hospitals' && styles.selectedItem]} 
+          <GradientSelectionCard 
+            selected={selectedOption === 'hospitals'} 
             onPress={() => setSelectedOption('hospitals')}
           >
             <View style={[styles.iconBox, { backgroundColor: COLORS.accent + '10' }]}>
@@ -215,10 +233,10 @@ export default function QRGenerateScreen() {
               <Text style={styles.itemDesc}>Verified hospital visits only</Text>
             </View>
             {selectedOption === 'hospitals' && <CheckCircle2 size={20} color={COLORS.primary} />}
-          </TouchableOpacity>
+          </GradientSelectionCard>
 
-          <TouchableOpacity 
-            style={[styles.selectionItem, selectedOption === 'folders' && styles.selectedItem]} 
+          <GradientSelectionCard 
+            selected={selectedOption === 'folders'} 
             onPress={() => setSelectedOption('folders')}
           >
             <View style={[styles.iconBox, { backgroundColor: COLORS.secondary + '10' }]}>
@@ -229,15 +247,15 @@ export default function QRGenerateScreen() {
               <Text style={styles.itemDesc}>Records you uploaded manually</Text>
             </View>
             {selectedOption === 'folders' && <CheckCircle2 size={20} color={COLORS.primary} />}
-          </TouchableOpacity>
+          </GradientSelectionCard>
 
           {hospitals.length > 0 && (
             <>
               <Text style={[styles.sectionTitle, { marginTop: SPACING.lg }]}>Specific Hospitals</Text>
               {hospitals.map((h) => (
-                <TouchableOpacity 
+                <GradientSelectionCard 
                   key={h.hospital_id}
-                  style={[styles.selectionItem, selectedOption === `hospital_${h.hospital_id}` && styles.selectedItem]} 
+                  selected={selectedOption === `hospital_${h.hospital_id}`} 
                   onPress={() => setSelectedOption(`hospital_${h.hospital_id}`)}
                 >
                   <View style={styles.iconBox}>
@@ -248,7 +266,7 @@ export default function QRGenerateScreen() {
                     <Text style={styles.itemDesc}>{h.visits?.length || 0} visits found</Text>
                   </View>
                   {selectedOption === `hospital_${h.hospital_id}` && <CheckCircle2 size={20} color={COLORS.primary} />}
-                </TouchableOpacity>
+                </GradientSelectionCard>
               ))}
             </>
           )}
@@ -257,9 +275,9 @@ export default function QRGenerateScreen() {
             <>
               <Text style={[styles.sectionTitle, { marginTop: SPACING.lg }]}>Specific Folders</Text>
               {folders.map((f) => (
-                <TouchableOpacity 
+                <GradientSelectionCard 
                   key={f.id || f.name}
-                  style={[styles.selectionItem, (selectedOption === `folder_${f.id}` || selectedOption === `folder_${f.name}`) && styles.selectedItem]} 
+                  selected={selectedOption === `folder_${f.id}` || selectedOption === `folder_${f.name}`} 
                   onPress={() => setSelectedOption(`folder_${f.id || f.name}`)}
                 >
                   <View style={styles.iconBox}>
@@ -270,7 +288,7 @@ export default function QRGenerateScreen() {
                     <Text style={styles.itemDesc}>{f.records?.length || 0} records</Text>
                   </View>
                   {(selectedOption === `folder_${f.id}` || selectedOption === `folder_${f.name}`) && <CheckCircle2 size={20} color={COLORS.primary} />}
-                </TouchableOpacity>
+                </GradientSelectionCard>
               ))}
             </>
           )}
@@ -410,19 +428,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  selectionGradientWrapper: {
+    padding: 1.5,
+    borderRadius: ROUNDING.md + 1.5,
+    marginBottom: SPACING.sm,
+  },
   selectionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
     padding: SPACING.md,
     borderRadius: ROUNDING.md,
-    marginBottom: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.soft,
   },
   selectedItem: {
-    borderColor: COLORS.primary,
     backgroundColor: COLORS.primary + '05',
   },
   iconBox: {
