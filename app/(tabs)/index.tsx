@@ -3,73 +3,21 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Refres
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
-  Search, 
+  Search as SearchIcon, 
   FolderOpen, 
   QrCode, 
   FileText,
   Sparkles,
   Upload,
   Hospital,
-  LogOut
+  LogOut,
+  LucideIcon
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { recordService, aiService } from '../../services/api';
-import { LucideIcon } from 'lucide-react-native';
-
-interface AnimatedActionCardProps {
-  icon: LucideIcon;
-  label: string;
-  onPress: () => void;
-}
-
-function AnimatedActionCard({ icon: Icon, label, onPress }: AnimatedActionCardProps) {
-  const [animation] = useState(new Animated.Value(0));
-
-  const handleIn = () => {
-    Animated.timing(animation, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handleOut = () => {
-    Animated.timing(animation, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  return (
-    <Pressable 
-      style={styles.actionCard}
-      onPress={onPress}
-      onHoverIn={handleIn}
-      onHoverOut={handleOut}
-      onPressIn={handleIn}
-      onPressOut={handleOut}
-    >
-      <View style={styles.actionIconBox}>
-        <View style={{ width: 24, height: 24 }}>
-          <Icon 
-            size={24} 
-            color={COLORS.primary} 
-          />
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: animation }]}>
-            <Icon 
-              size={24} 
-              color={COLORS.success} 
-              fill={COLORS.success}
-            />
-          </Animated.View>
-        </View>
-      </View>
-      <Text style={styles.actionLabel}>{label}</Text>
-    </Pressable>
-  );
-}
+import { AnimatedCard } from '../../components/AnimatedCard';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function HomeScreen() {
   const { user, signOut } = useAuth();
@@ -199,16 +147,23 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.searchContainer}>
-          <Search size={20} color={COLORS.text.secondary} style={styles.searchIcon} />
-          <TextInput 
-            placeholder="Search records, labs, or providers..." 
-            placeholderTextColor={COLORS.text.secondary + '80'}
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+        <LinearGradient
+          colors={[COLORS.success, COLORS.primary, COLORS.success]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.searchGradientBorder}
+        >
+          <View style={styles.searchContainer}>
+            <SearchIcon size={20} color={COLORS.text.secondary} style={styles.searchIcon} />
+            <TextInput 
+              placeholder="Search records, labs, or providers..." 
+              placeholderTextColor={COLORS.text.secondary + '80'}
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+        </LinearGradient>
 
         {searchQuery.length > 0 ? (
           <View style={styles.searchResults}>
@@ -216,10 +171,15 @@ export default function HomeScreen() {
               <View style={styles.resultSection}>
                 <Text style={styles.resultHeader}>Folders</Text>
                 {filteredFolders.map((folder, i) => (
-                  <TouchableOpacity key={folder.id || i} style={styles.resultItem} onPress={() => router.push(`/folder/${folder.name}`)}>
-                    <FolderOpen size={20} color={COLORS.primary} />
+                  <AnimatedCard
+                    key={folder.id || i}
+                    icon={FolderOpen}
+                    iconSize={20}
+                    style={styles.resultItem}
+                    onPress={() => router.push(`/folder/${folder.name}`)}
+                  >
                     <Text style={styles.resultText}>{folder.name}</Text>
-                  </TouchableOpacity>
+                  </AnimatedCard>
                 ))}
               </View>
             )}
@@ -228,10 +188,15 @@ export default function HomeScreen() {
               <View style={styles.resultSection}>
                 <Text style={styles.resultHeader}>Hospitals</Text>
                 {filteredHospitals.map((hospital, i) => (
-                  <TouchableOpacity key={hospital.hospital_id || i} style={styles.resultItem} onPress={() => router.push(`/facility/${hospital.hospital_id}`)}>
-                    <Hospital size={20} color={COLORS.primary} />
+                  <AnimatedCard
+                    key={hospital.hospital_id || i}
+                    icon={Hospital}
+                    iconSize={20}
+                    style={styles.resultItem}
+                    onPress={() => router.push(`/facility/${hospital.hospital_id}`)}
+                  >
                     <Text style={styles.resultText}>{hospital.hospital_name}</Text>
-                  </TouchableOpacity>
+                  </AnimatedCard>
                 ))}
               </View>
             )}
@@ -240,10 +205,15 @@ export default function HomeScreen() {
               <View style={styles.resultSection}>
                 <Text style={styles.resultHeader}>Documents</Text>
                 {filteredRecords.map((record, i) => (
-                  <TouchableOpacity key={record.id || i} style={styles.resultItem} onPress={() => router.push(`/summary/${record.id}`)}>
-                    <FileText size={20} color={COLORS.primary} />
+                  <AnimatedCard
+                    key={record.id || i}
+                    icon={FileText}
+                    iconSize={20}
+                    style={styles.resultItem}
+                    onPress={() => router.push(`/summary/${record.id}`)}
+                  >
                     <Text style={styles.resultText} numberOfLines={1}>{getDocTitle(record)}</Text>
-                  </TouchableOpacity>
+                  </AnimatedCard>
                 ))}
               </View>
             )}
@@ -257,29 +227,45 @@ export default function HomeScreen() {
         ) : (
           <>
             <View style={styles.quickActions}>
-          <AnimatedActionCard 
+          <AnimatedCard 
             icon={FolderOpen}
             label="Records"
+            style={styles.actionCard}
+            iconBoxStyle={styles.actionIconBox}
             onPress={() => router.push('/records')}
-          />
+          >
+            <Text style={styles.actionLabel}>Records</Text>
+          </AnimatedCard>
 
-          <AnimatedActionCard 
+          <AnimatedCard 
             icon={QrCode}
             label="Generate QR"
+            style={styles.actionCard}
+            iconBoxStyle={styles.actionIconBox}
             onPress={() => router.push('/qr')}
-          />
+          >
+            <Text style={styles.actionLabel}>Generate QR</Text>
+          </AnimatedCard>
 
-          <AnimatedActionCard 
+          <AnimatedCard 
             icon={Upload}
             label="Upload"
+            style={styles.actionCard}
+            iconBoxStyle={styles.actionIconBox}
             onPress={() => router.push('/upload')}
-          />
+          >
+            <Text style={styles.actionLabel}>Upload</Text>
+          </AnimatedCard>
 
-          <AnimatedActionCard 
+          <AnimatedCard 
             icon={Hospital}
             label="Hospital"
+            style={styles.actionCard}
+            iconBoxStyle={styles.actionIconBox}
             onPress={() => router.push('/hospitals')}
-          />
+          >
+            <Text style={styles.actionLabel}>Hospital</Text>
+          </AnimatedCard>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -371,14 +357,18 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginTop: -4,
   },
+  searchGradientBorder: {
+    padding: 1.5,
+    borderRadius: ROUNDING.full,
+    marginBottom: SPACING.xl,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    borderRadius: ROUNDING.full,
+    borderRadius: ROUNDING.full - 1.5,
     paddingHorizontal: 16,
-    height: 48,
-    marginBottom: SPACING.xl,
+    height: 46,
   },
   searchIcon: {
     marginRight: 8,

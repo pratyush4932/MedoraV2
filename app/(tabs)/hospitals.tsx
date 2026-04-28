@@ -6,12 +6,13 @@ import {
   Hospital as HospitalIcon, 
   ChevronRight, 
   Calendar, 
-  User,
+  CircleUserRound,
   ShieldCheck
 } from 'lucide-react-native';
 import { COLORS, SPACING, SHADOWS, ROUNDING } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { recordService } from '../../services/api';
+import { AnimatedCard } from '../../components/AnimatedCard';
 
 export default function HospitalListScreen() {
   const { user, token } = useAuth();
@@ -90,7 +91,7 @@ export default function HospitalListScreen() {
           <Text style={styles.headerTitle}>Medical Facilities</Text>
         </View>
         <TouchableOpacity style={styles.avatarCircle}>
-          <User size={20} color={COLORS.white} />
+          <CircleUserRound size={22} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
@@ -121,21 +122,23 @@ export default function HospitalListScreen() {
             const latestVisit = visitDates.length > 0 ? new Date(Math.max(...visitDates)) : null;
 
             return (
-              <TouchableOpacity 
+              <AnimatedCard 
                 key={hospital.hospital_id || index} 
+                icon={HospitalIcon}
+                iconSize={26}
                 style={styles.card}
+                iconBoxStyle={styles.cardIconBox}
                 onPress={() => router.push({
                   pathname: `/facility/${hospital.hospital_id}`,
                   params: { name: hospitalName }
                 })}
-              >
-                <View style={styles.cardIconBox}>
-                  <HospitalIcon size={26} color={COLORS.primary} />
+                iconBoxChildren={
                   <View style={styles.verifiedBadge}>
                     <ShieldCheck size={10} color={COLORS.white} />
                   </View>
-                </View>
-                
+                }
+                borderRadius={24}
+              >
                 <View style={styles.cardInfo}>
                   <Text style={styles.cardName} numberOfLines={1}>
                     {hospitalName}
@@ -156,7 +159,7 @@ export default function HospitalListScreen() {
                 </View>
                 
                 <ChevronRight size={20} color={COLORS.text.secondary} />
-              </TouchableOpacity>
+              </AnimatedCard>
             );
           })}
         </View>
@@ -211,12 +214,14 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
   },
   avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.secondary,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.primary + '15',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary + '30',
   },
   scrollContent: {
     padding: SPACING.lg,

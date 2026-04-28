@@ -12,6 +12,7 @@ import {
 import { COLORS, SPACING, SHADOWS } from '../../../constants/theme';
 import { useAuth } from '../../../context/AuthContext';
 import { recordService } from '../../../services/api';
+import { AnimatedCard } from '../../../components/AnimatedCard';
 
 export default function HospitalDetailScreen() {
   const { id, name } = useLocalSearchParams();
@@ -101,9 +102,12 @@ export default function HospitalDetailScreen() {
 
         <View style={styles.folderGrid}>
           {hospitalData.visits?.map((visit: any, index: number) => (
-            <TouchableOpacity 
+            <AnimatedCard 
               key={index} 
+              icon={Folder}
+              iconSize={28}
               style={styles.folderCard}
+              iconBoxStyle={styles.folderIconBox}
               onPress={() => router.push({
                 pathname: `/facility/${id}/${visit.date || visit.visit_date}`,
                 params: { 
@@ -111,16 +115,14 @@ export default function HospitalDetailScreen() {
                   dateStr: visit.date || visit.visit_date
                 }
               })}
+              borderRadius={24}
             >
-              <View style={styles.folderIconBox}>
-                <Folder size={28} color={COLORS.primary} fill={COLORS.primary + '20'} />
-              </View>
               <Text style={styles.folderName}>{formatDate(visit.date || visit.visit_date)}</Text>
               <View style={styles.metaRow}>
                 <FileText size={12} color={COLORS.text.secondary} />
                 <Text style={styles.folderCount}>{visit.records?.length || 0} Files</Text>
               </View>
-            </TouchableOpacity>
+            </AnimatedCard>
           ))}
         </View>
 

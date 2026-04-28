@@ -22,11 +22,14 @@ import {
   ChevronRight, 
   Clock,
   Plus,
-  X
+  X,
+  FolderOpen
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { recordService } from '../../services/api';
+import { AnimatedCard } from '../../components/AnimatedCard';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function RecordsScreen() {
   const { user } = useAuth();
@@ -160,11 +163,18 @@ export default function RecordsScreen() {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.searchBar}>
-          <Search size={20} color="#9CA3AF" />
-          <Text style={styles.searchText}>Search reports, labs, doctors...</Text>
-          <Filter size={20} color={COLORS.primary} />
-        </View>
+        <LinearGradient
+          colors={[COLORS.success, COLORS.primary, COLORS.success]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.searchGradientBorder}
+        >
+          <View style={styles.searchBar}>
+            <Search size={20} color="#9CA3AF" />
+            <Text style={styles.searchText}>Search reports, labs, doctors...</Text>
+            <Filter size={20} color={COLORS.primary} />
+          </View>
+        </LinearGradient>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Folders</Text>
@@ -175,17 +185,18 @@ export default function RecordsScreen() {
 
         <View style={styles.folderGrid}>
           {folders.map((folder, index) => (
-            <TouchableOpacity 
+            <AnimatedCard 
               key={folder.id || index} 
+              icon={Folder}
+              iconSize={28}
               style={styles.folderCard}
+              iconBoxStyle={styles.folderIconBox}
               onPress={() => router.push(`/folder/${folder.name}`)}
+              borderRadius={24}
             >
-              <View style={styles.folderIconBox}>
-                <Folder size={28} color={COLORS.primary} fill={COLORS.primary + '20'} />
-              </View>
               <Text style={styles.folderName} numberOfLines={1}>{folder.name || 'Untitled'}</Text>
               <Text style={styles.folderCount}>{folder.records?.length || 0} Files</Text>
-            </TouchableOpacity>
+            </AnimatedCard>
           ))}
           {folders.length === 0 && (
             <View style={styles.emptyContainer}>
@@ -203,14 +214,15 @@ export default function RecordsScreen() {
 
         <View style={styles.docsList}>
           {recentDocs.map((doc, index) => (
-            <TouchableOpacity 
+            <AnimatedCard 
               key={doc.id || index} 
+              icon={FileText}
+              iconSize={22}
               style={styles.docCard}
+              iconBoxStyle={styles.docIconBox}
               onPress={() => router.push(`/summary/${doc.id}`)}
+              borderRadius={20}
             >
-              <View style={styles.docIconBox}>
-                <FileText size={22} color={COLORS.primary} />
-              </View>
               <View style={styles.docInfo}>
                 <Text style={styles.docTitle} numberOfLines={1}>
                   {getDocTitle(doc)}
@@ -223,7 +235,7 @@ export default function RecordsScreen() {
                 </View>
               </View>
               <ChevronRight size={20} color={COLORS.text.secondary} />
-            </TouchableOpacity>
+            </AnimatedCard>
           ))}
           
           {recentDocs.length === 0 && (
@@ -322,15 +334,19 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     paddingBottom: 100,
   },
+  searchGradientBorder: {
+    padding: 1.5,
+    borderRadius: 16,
+    marginBottom: SPACING.xl,
+    ...SHADOWS.soft,
+  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: 16,
+    borderRadius: 16 - 1.5,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: SPACING.xl,
-    ...SHADOWS.soft,
+    paddingVertical: 10,
   },
   searchText: {
     flex: 1,

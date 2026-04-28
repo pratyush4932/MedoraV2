@@ -11,6 +11,7 @@ import {
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { recordService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { AnimatedCard } from '../../components/AnimatedCard';
 
 export default function FolderDetailScreen() {
   const { name } = useLocalSearchParams<{ name: string }>();
@@ -101,18 +102,18 @@ export default function FolderDetailScreen() {
         {records.length > 0 ? (
           <View style={styles.docsList}>
             {records.map((record, index) => (
-              <TouchableOpacity
+              <AnimatedCard
                 key={record.id || index}
+                icon={FileText}
+                iconSize={22}
                 style={[
                   styles.docItem,
                   index === records.length - 1 && styles.docItemLast,
                 ]}
-                activeOpacity={0.7}
+                iconBoxStyle={styles.docIconBox}
                 onPress={() => router.push(`/summary/${record.id}`)}
+                borderRadius={index === 0 ? 24 : index === records.length - 1 ? 24 : 0}
               >
-                <View style={styles.docIconBox}>
-                  <FileText size={22} color={COLORS.primary} />
-                </View>
                 <View style={styles.docInfo}>
                   <Text style={styles.docTitle} numberOfLines={1}>
                     {getDocTitle(record)}
@@ -120,7 +121,7 @@ export default function FolderDetailScreen() {
                   <Text style={styles.docMeta}>{getDocDate(record)}</Text>
                 </View>
                 <ChevronRight size={20} color={COLORS.text.secondary} />
-              </TouchableOpacity>
+              </AnimatedCard>
             ))}
           </View>
         ) : (

@@ -14,6 +14,7 @@ import {
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../../constants/theme';
 import { useAuth } from '../../../context/AuthContext';
 import { recordService } from '../../../services/api';
+import { AnimatedCard } from '../../../components/AnimatedCard';
 
 export default function VisitFilesScreen() {
   const { id, date, hospitalName: initialName, dateStr } = useLocalSearchParams();
@@ -68,9 +69,9 @@ export default function VisitFilesScreen() {
 
   const getDocIcon = (type: string, title: string) => {
     const t = (type || title || '').toLowerCase();
-    if (t.includes('blood') || t.includes('lab')) return <FlaskConical size={22} color={COLORS.primary} />;
-    if (t.includes('mri') || t.includes('scan') || t.includes('imaging')) return <Activity size={22} color={COLORS.primary} />;
-    return <FileText size={22} color={COLORS.primary} />;
+    if (t.includes('blood') || t.includes('lab')) return FlaskConical;
+    if (t.includes('mri') || t.includes('scan') || t.includes('imaging')) return Activity;
+    return FileText;
   };
 
   const getDocTitle = (doc: any) => {
@@ -116,14 +117,15 @@ export default function VisitFilesScreen() {
 
         <View style={styles.listContainer}>
           {records?.map((doc, index) => (
-            <TouchableOpacity 
+            <AnimatedCard 
               key={doc.id || index} 
+              icon={getDocIcon(doc.file_type, doc.ai_summary?.reports?.[0])}
+              iconSize={22}
               style={styles.docCard}
+              iconBoxStyle={styles.docIconBox}
               onPress={() => router.push(`/summary/${doc.id}`)}
+              borderRadius={20}
             >
-              <View style={styles.docIconBox}>
-                {getDocIcon(doc.file_type, doc.ai_summary?.reports?.[0])}
-              </View>
               <View style={styles.docInfo}>
                 <Text style={styles.docTitle} numberOfLines={1}>
                   {getDocTitle(doc)}
@@ -134,7 +136,7 @@ export default function VisitFilesScreen() {
                 </View>
               </View>
               <ChevronRight size={20} color={COLORS.text.secondary} />
-            </TouchableOpacity>
+            </AnimatedCard>
           ))}
         </View>
 
