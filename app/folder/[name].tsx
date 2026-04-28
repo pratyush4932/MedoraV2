@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
   ArrowLeft, 
@@ -17,18 +18,16 @@ export default function FolderDetailScreen() {
   const [records, setRecords] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchFolderRecords();
-  }, [name]);
-
   const fetchFolderRecords = async (silent = false) => {
     if (!user) return;
     if (!silent) setIsLoading(true);
     try {
-      const data = await recordService.getUserRecords(user.id);
-      const folder = data.records_view?.folders.find((f: any) => f.name === name);
+      const data = await recordService.getMyProfile();
+      const folder = data?.records_view?.folders?.find((f: any) => f.name === name);
       if (folder) {
         setRecords(folder.records || []);
+      } else {
+        setRecords([]);
       }
     } catch (err) {
       console.error('Fetch folder records error', err);
@@ -36,6 +35,12 @@ export default function FolderDetailScreen() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user?.id && name) {
+      fetchFolderRecords();
+    }
+  }, [user?.id, name]);
 
   useEffect(() => {
     const hasProcessing = records.some(r => r.status === 'processing');
@@ -60,7 +65,9 @@ export default function FolderDetailScreen() {
     const date = record.visit_date || record.created_at || record.uploaded_at;
     if (!date) return 'Recent';
     try {
-      return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return 'Recent';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } catch (e) {
       return 'Recent';
     }
@@ -75,7 +82,7 @@ export default function FolderDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ArrowLeft size={24} color={COLORS.text.primary} />
@@ -157,7 +164,6 @@ const styles = StyleSheet.create({
     color: COLORS.text.secondary,
     fontWeight: '600',
   },
-  // Document list (mirrors records.tsx style)
   docsList: {
     backgroundColor: COLORS.white,
     borderRadius: 24,

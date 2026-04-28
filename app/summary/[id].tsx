@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
-  SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, ArrowLeft, ExternalLink, FileText, Pill, RefreshCw, Sparkles } from 'lucide-react-native';
 import { COLORS, ROUNDING, SHADOWS, SPACING } from '../../constants/theme';
@@ -16,8 +16,8 @@ import { Card } from '../../components/common/Card';
 import { recordService, qrService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
-const POLL_INTERVAL_MS = 4000;   // how often to re-check (ms)
-const MAX_POLL_ATTEMPTS = 20;    // give up after ~80 seconds
+const POLL_INTERVAL_MS = 4000;   
+const MAX_POLL_ATTEMPTS = 20;    
 
 export default function AISummaryScreen() {
   const { id } = useLocalSearchParams();
@@ -33,18 +33,30 @@ export default function AISummaryScreen() {
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Fetch the record (silent = don't show full-screen spinner) ──────────────
   const fetchRecord = useCallback(
     async (silent = false) => {
       if (!user) return null;
       if (!silent) setIsLoading(true);
       try {
-        const data = await recordService.getUserRecords(user.id);
+        const data = await recordService.getMyProfile();
         let found: any = null;
+        
+        // 1. Search in personal folders
         data.records_view?.folders?.forEach((f: any) => {
           const r = f.records?.find((rec: any) => rec.id === id);
           if (r) found = r;
         });
+
+        // 2. Search in hospital visits if not found yet
+        if (!found) {
+          data.hospital_view?.forEach((h: any) => {
+            h.visits?.forEach((v: any) => {
+              const r = v.records?.find((rec: any) => rec.id === id);
+              if (r) found = r;
+            });
+          });
+        }
+
         setRecord(found);
         return found;
       } catch (err) {
@@ -54,27 +66,25 @@ export default function AISummaryScreen() {
         if (!silent) setIsLoading(false);
       }
     },
-    [user, id]
+    [user?.id, id]
   );
 
-  // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchRecord(false);
+    if (user?.id) {
+      fetchRecord(false);
+    }
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
-  }, [fetchRecord]);
+  }, [user?.id, id, fetchRecord]);
 
-  // ── Polling loop: keeps running as long as ai_summary is missing ─────────────
   useEffect(() => {
-    // If we have ai_summary already, no polling needed
     if (record && record.ai_summary) {
       setIsPolling(false);
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       return;
     }
 
-    // If record is loaded but has no ai_summary, start polling
     if (record && !record.ai_summary && !pollingGaveUp) {
       setIsPolling(true);
 
@@ -85,10 +95,8 @@ export default function AISummaryScreen() {
           setPollCount(nextAttempt);
 
           if (latest?.ai_summary) {
-            // Got it! Stop polling.
             setIsPolling(false);
           } else if (nextAttempt >= MAX_POLL_ATTEMPTS) {
-            // Give up gracefully
             setIsPolling(false);
             setPollingGaveUp(true);
           } else {
@@ -103,16 +111,14 @@ export default function AISummaryScreen() {
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       };
     }
-  }, [record, pollingGaveUp]);
+  }, [record?.id, !!record?.ai_summary, pollingGaveUp]);
 
-  // ── Manual refresh ──────────────────────────────────────────────────────────
   const handleRefresh = async () => {
     setPollingGaveUp(false);
     setPollCount(0);
     await fetchRecord(false);
   };
 
-  // ── Secure Document Viewing (Workaround for Private Buckets) ────────────────
   const handleViewDocument = async () => {
     if (!record) return;
 
@@ -123,13 +129,10 @@ export default function AISummaryScreen() {
 
     try {
       setIsOpeningDoc(true);
-      // Generate a temporary QR token just for this record to securely get a signed URL
       const { token } = await qrService.generateQR([record.id]);
       const qrData = await qrService.getQRData(token);
-      
       const secureRecord = qrData.records?.find((r: any) => r.id === record.id);
       
-      // The QR endpoint seamlessly replaces the public file_url with a signed URL!
       if (secureRecord && secureRecord.file_url) {
         Linking.openURL(secureRecord.file_url);
       } else if (record.file_url) {
@@ -145,7 +148,6 @@ export default function AISummaryScreen() {
     }
   };
 
-  // ── Loading state ───────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -154,7 +156,6 @@ export default function AISummaryScreen() {
     );
   }
 
-  // ── Record not found ────────────────────────────────────────────────────────
   if (!record) {
     return (
       <SafeAreaView style={styles.container}>
@@ -175,7 +176,7 @@ export default function AISummaryScreen() {
   const aiSummary = record.ai_summary;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.headerNav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ArrowLeft size={24} color={COLORS.text.primary} />
@@ -185,7 +186,6 @@ export default function AISummaryScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Record brief */}
         <View style={styles.recordBrief}>
           <View style={styles.iconCircle}>
             <FileText size={32} color={COLORS.primary} />
@@ -196,10 +196,8 @@ export default function AISummaryScreen() {
           <Text style={styles.subtitle}>Analyzed by Medora AI</Text>
         </View>
 
-        {/* ── AI Summary available ── */}
         {aiSummary ? (
           <>
-            {/* Summary text */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Sparkles size={20} color={COLORS.primary} />
@@ -222,24 +220,9 @@ export default function AISummaryScreen() {
                     ))}
                   </View>
                 )}
-
-                {aiSummary.findings?.length > 0 && !aiSummary.key_findings?.length && (
-                  <View style={styles.findingsList}>
-                    {(Array.isArray(aiSummary.findings)
-                      ? aiSummary.findings
-                      : [aiSummary.findings]
-                    ).map((item: any, index: number) => (
-                      <View key={index} style={styles.listItem}>
-                        <View style={styles.listDot} />
-                        <Text style={styles.listText}>{item}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
               </Card>
             </View>
 
-            {/* Medications */}
             {aiSummary.medications?.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -265,45 +248,8 @@ export default function AISummaryScreen() {
                 </Card>
               </View>
             )}
-
-            {/* Allergies */}
-            {aiSummary.allergies?.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <AlertTriangle size={20} color={COLORS.accent} />
-                  <Text style={styles.sectionTitle}>Allergy Alerts</Text>
-                </View>
-                <Card style={styles.summaryCard}>
-                  {aiSummary.allergies.map((item: any, index: number) => (
-                    <View key={index} style={styles.listItem}>
-                      <View style={styles.listDot} />
-                      <Text style={styles.listText}>{item}</Text>
-                    </View>
-                  ))}
-                </Card>
-              </View>
-            )}
-
-            {/* Diagnosis */}
-            {aiSummary.diagnosis?.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <FileText size={20} color={COLORS.primary} />
-                  <Text style={styles.sectionTitle}>Diagnosis</Text>
-                </View>
-                <Card style={styles.summaryCard}>
-                  {aiSummary.diagnosis.map((item: any, index: number) => (
-                    <View key={index} style={styles.listItem}>
-                      <View style={styles.listDot} />
-                      <Text style={styles.listText}>{item}</Text>
-                    </View>
-                  ))}
-                </Card>
-              </View>
-            )}
           </>
         ) : (
-          /* ── AI Summary not yet available ── */
           <View style={styles.emptyState}>
             {isPolling ? (
               <>
@@ -335,7 +281,6 @@ export default function AISummaryScreen() {
           </View>
         )}
 
-        {/* View Original Document Button */}
         {record && (record.signed_url || record.file_url) && (
           <TouchableOpacity
             style={styles.viewFileBtn}
@@ -354,7 +299,6 @@ export default function AISummaryScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Disclaimer */}
         <View style={styles.disclaimer}>
           <Text style={styles.disclaimerText}>
             Note: This summary is AI-generated and should be verified by a medical professional.

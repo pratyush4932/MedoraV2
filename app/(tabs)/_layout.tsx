@@ -1,11 +1,37 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { Home, Plus, Hospital } from 'lucide-react-native';
-import { COLORS, SHADOWS, ROUNDING } from '../../constants/theme';
-import { Platform, View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { Home, Plus, Hospital, FolderOpen, QrCode } from 'lucide-react-native';
+import { COLORS, SHADOWS } from '../../constants/theme';
+import { Platform, View, TouchableOpacity, StyleSheet, Text, Animated, Easing } from 'react-native';
 
 export default function TabLayout() {
   const router = useRouter();
+  
+  // Floating animation setup
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const startFloating = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(translateY, {
+            toValue: -6,
+            duration: 1500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: 1500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    startFloating();
+  }, []);
 
   return (
     <Tabs
@@ -23,7 +49,7 @@ export default function TabLayout() {
           ...SHADOWS.medium,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: '600',
           marginTop: 4,
         },
@@ -35,7 +61,19 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
-              <Home size={24} color={color} fill={focused ? color : 'none'} />
+              <Home size={22} color={color} fill={focused ? color : 'none'} />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="qr"
+        options={{
+          title: 'QR Share',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
+              <QrCode size={22} color={color} fill={focused ? color : 'none'} />
             </View>
           ),
         }}
@@ -51,9 +89,12 @@ export default function TabLayout() {
               onPress={() => router.push('/upload')}
               activeOpacity={0.9}
             >
-              <View style={styles.uploadBtn}>
+              <Animated.View style={[
+                styles.uploadBtn,
+                { transform: [{ translateY }] }
+              ]}>
                 <Plus size={32} color={COLORS.white} strokeWidth={3} />
-              </View>
+              </Animated.View>
               <Text style={styles.uploadLabel}>Upload</Text>
             </TouchableOpacity>
           ),
@@ -63,10 +104,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="records"
         options={{
-          title: 'Hospital',
+          title: 'Records',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
-              <Hospital size={24} color={color} fill={focused ? color : 'none'} />
+              <FolderOpen size={22} color={color} fill={focused ? color : 'none'} />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="hospitals"
+        options={{
+          title: 'Facility',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
+              <Hospital size={22} color={color} fill={focused ? color : 'none'} />
             </View>
           ),
         }}
@@ -75,7 +128,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          href: null, // Hide settings from nav as per mockup
+          href: null,
         }}
       />
     </Tabs>
@@ -84,25 +137,26 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   iconWrapper: {
-    width: 64,
-    height: 40,
+    width: 44,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 10,
   },
   activeIconWrapper: {
-    backgroundColor: '#E6F4F4', // Light teal background for active state
+    backgroundColor: '#E6F4F4',
   },
   uploadBtnContainer: {
-    top: -16,
+    top: -24,
+    left: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    flex: 1,
+    width: 64,
   },
   uploadBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -111,8 +165,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   uploadLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#9CA3AF',
     marginTop: 2,
   },

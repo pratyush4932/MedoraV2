@@ -11,6 +11,12 @@ const api = axios.create({
   },
 });
 
+let on401Callback: (() => void) | null = null;
+
+export const set401Callback = (callback: () => void) => {
+  on401Callback = callback;
+};
+
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('userToken');
   if (token) {
@@ -19,11 +25,27 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      console.warn('Unauthorized request detected (401). Clearing session...');
+      if (on401Callback) {
+        on401Callback();
+      } else {
+        // Fallback: just clear storage
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('user');
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
 
 export const authService = {
   sendOTP: async (phone: string) => {
-    // Ensure phone starts with +
     const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
     const response = await api.post('/auth/signin/send-otp', { phone: formattedPhone });
     return response.data;
@@ -61,9 +83,13 @@ export const authService = {
     return response.data;
   },
   signout: async () => {
-    const response = await api.post('/auth/signout');
+    try {
+      await api.post('/auth/signout');
+    } catch (e) {
+      console.warn('Signout request failed', e);
+    }
     await AsyncStorage.removeItem('userToken');
-    return response.data;
+    await AsyncStorage.removeItem('user');
   },
 };
 
@@ -76,8 +102,12 @@ export const recordService = {
     });
     return response.data;
   },
-  getUserRecords: async (userId: string) => {
-    const response = await api.get(`/records/user/${userId}`);
+  getMyProfile: async () => {
+    const response = await api.get('/user/me');
+    return response.data;
+  },
+  getUserFullProfile: async (userId: string) => {
+    const response = await api.get(`/user/${userId}`);
     return response.data;
   },
   getUserFolders: async () => {

@@ -1,14 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, RefreshControl, FlatList } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  RefreshControl, 
+  ActivityIndicator, 
+  Modal, 
+  TextInput, 
+  Alert,
+  Platform
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
-  Bell, 
+  Search, 
+  Filter, 
+  Folder, 
+  FileText, 
   ChevronRight, 
-  FileText,
-  FlaskConical,
-  ClipboardList,
-  Activity,
-  Folder
+  Clock,
+  Plus,
+  X
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -21,37 +35,47 @@ export default function RecordsScreen() {
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Create Folder Modal State
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   const fetchData = async (silent = false) => {
     if (!user) return;
     if (!silent) setIsLoading(true);
     try {
       const [foldersList, recordsData] = await Promise.all([
-        recordService.getUserFolders(),
-        recordService.getUserRecords(user.id)
+        recordService.getUserFolders().catch(() => []),
+        recordService.getMyProfile().catch(() => ({ records_view: { folders: [] } }))
       ]);
       
-      // Merge: Start with all folders from the database
-      const mergedFolders = foldersList.map((f: any) => {
-        // Find matching record data if any
-        const recordsFolder = recordsData.records_view?.folders?.find((rf: any) => rf.id === f.id || rf.name === f.name);
+      const mergedFolders = (foldersList || []).map((f: any) => {
+        const recordsFolder = recordsData?.records_view?.folders?.find((rf: any) => rf.id === f.id || rf.name === f.name);
         return {
           ...f,
-          records: recordsFolder ? recordsFolder.records : []
+          records: recordsFolder ? (recordsFolder.records || []) : []
         };
       });
 
-      // User folders only as requested - filtering out default "Personal" folder
       const filteredFolders = mergedFolders.filter((f: any) => f.name !== 'Personal');
       setFolders(filteredFolders);
       
-      // Flatten all docs from folders for "Recent Documents"
       let allDocs: any[] = [];
-      recordsData.records_view?.folders.forEach((f: any) => {
-        allDocs = [...allDocs, ...f.records];
+      recordsData?.records_view?.folders?.forEach((f: any) => {
+        if (f.records && Array.isArray(f.records)) {
+          allDocs = [...allDocs, ...f.records];
+        }
       });
-      allDocs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setRecentDocs(allDocs.slice(0, 5));
+      
+      if (allDocs.length > 0) {
+        allDocs.sort((a, b) => {
+          const dateA = new Date(a.created_at || a.date || a.visit_date || 0).getTime();
+          const dateB = new Date(b.created_at || b.date || b.visit_date || 0).getTime();
+          return dateB - dateA;
+        });
+      }
+      setRecentDocs(allDocs.slice(0, 10));
     } catch (err) {
       console.error('Fetch records error', err);
     } finally {
@@ -61,42 +85,62 @@ export default function RecordsScreen() {
   };
 
   useEffect(() => {
-    const hasProcessing = folders.some(f => f.records?.some((r: any) => r.status === 'processing')) || 
-                        recentDocs.some(r => r.status === 'processing');
-    if (hasProcessing) {
-      const timer = setTimeout(() => fetchData(true), 3000);
-      return () => clearTimeout(timer);
+    if (user?.id) {
+      fetchData();
     }
-  }, [folders, recentDocs]);
-
-  useEffect(() => {
-    fetchData();
-  }, [user]);
+  }, [user?.id]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    fetchData();
+    fetchData(true);
   };
 
-  const getFolderIcon = (name: string) => {
-    const n = name.toLowerCase();
-    if (n.includes('lab')) return <FlaskConical size={24} color={COLORS.primary} />;
-    if (n.includes('pres')) return <ClipboardList size={24} color={COLORS.primary} />;
-    if (n.includes('imag') || n.includes('scan')) return <Activity size={24} color={COLORS.primary} />;
-    return <Folder size={24} color={COLORS.primary} />;
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) {
+      Alert.alert('Error', 'Please enter a folder name');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      await recordService.createFolder(newFolderName.trim());
+      setNewFolderName('');
+      setIsModalVisible(false);
+      fetchData(true);
+      Alert.alert('Success', `Folder "${newFolderName}" created successfully`);
+    } catch (error) {
+      console.error('Create folder error', error);
+      Alert.alert('Error', 'Failed to create folder. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
   };
+
+  const formatDate = (dateStr: any) => {
+    try {
+      if (!dateStr) return 'Unknown Date';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString();
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.logoCircle}>
-            <FileText size={20} color={COLORS.white} fill={COLORS.white} />
-          </View>
-          <Text style={styles.brandName}>Medora</Text>
-        </View>
-        <TouchableOpacity style={styles.notificationBtn}>
-          <Bell size={24} color={COLORS.primary} />
+        <Text style={styles.headerTitle}>Medical Records</Text>
+        <TouchableOpacity style={styles.searchBtn}>
+          <Search size={22} color={COLORS.text.primary} />
         </TouchableOpacity>
       </View>
 
@@ -105,14 +149,18 @@ export default function RecordsScreen() {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroSection}>
-          <Text style={styles.title}>Records</Text>
-          <Text style={styles.subtitle}>
-            Your clinical narrative, curated and secured with fintech-grade precision.
-          </Text>
+        <View style={styles.searchBar}>
+          <Search size={20} color="#9CA3AF" />
+          <Text style={styles.searchText}>Search reports, labs, doctors...</Text>
+          <Filter size={20} color={COLORS.primary} />
         </View>
 
-        {/* Removed Filter Tabs (All, Hospital, Manual) as requested */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Folders</Text>
+          <TouchableOpacity onPress={() => setIsModalVisible(true)}>
+            <Text style={styles.seeAll}>Create New</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.folderGrid}>
           {folders.map((folder, index) => (
@@ -122,54 +170,116 @@ export default function RecordsScreen() {
               onPress={() => router.push(`/folder/${folder.name}`)}
             >
               <View style={styles.folderIconBox}>
-                {getFolderIcon(folder.name)}
+                <Folder size={28} color={COLORS.primary} fill={COLORS.primary + '20'} />
               </View>
-              <Text style={styles.folderName} numberOfLines={1}>{folder.name}</Text>
-              <Text style={styles.folderCount}>{folder.records?.length || 0} Documents</Text>
+              <Text style={styles.folderName} numberOfLines={1}>{folder.name || 'Untitled'}</Text>
+              <Text style={styles.folderCount}>{folder.records?.length || 0} Files</Text>
             </TouchableOpacity>
           ))}
-          {/* Add a placeholder if folders are empty */}
           {folders.length === 0 && (
-            <View style={styles.emptyGrid}>
-              <Text style={styles.emptyText}>No folders found.</Text>
+            <View style={styles.emptyContainer}>
+               <Text style={styles.emptyText}>No folders created.</Text>
             </View>
           )}
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Documents</Text>
-          <TouchableOpacity>
-            <Text style={styles.viewAllText}>View All</Text>
+          <TouchableOpacity onPress={() => {}}>
+            <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.docsList}>
-          {recentDocs.length > 0 ? (
-            recentDocs.map((doc, index) => (
-              <TouchableOpacity 
-                key={doc.id || index} 
-                style={styles.docItem}
-                onPress={() => router.push(`/summary/${doc.id}`)}
-              >
-                <View style={styles.docIconBox}>
-                  <FileText size={22} color={COLORS.text.primary} />
-                </View>
-                <View style={styles.docInfo}>
-                  <Text style={styles.docTitle} numberOfLines={1}>
-                    {doc.status === 'processing' ? 'Generating AI summary...' : (doc.ai_summary?.reports?.[0] || doc.file_type || 'Health Report')}
+          {recentDocs.map((doc, index) => (
+            <TouchableOpacity 
+              key={doc.id || index} 
+              style={styles.docCard}
+              onPress={() => router.push(`/summary/${doc.id}`)}
+            >
+              <View style={styles.docIconBox}>
+                <FileText size={22} color={COLORS.primary} />
+              </View>
+              <View style={styles.docInfo}>
+                <Text style={styles.docTitle} numberOfLines={1}>
+                  {doc.ai_summary?.reports?.[0] || doc.file_type || 'Medical Report'}
+                </Text>
+                <View style={styles.docMeta}>
+                  <Clock size={12} color={COLORS.text.secondary} />
+                  <Text style={styles.docMetaText}>
+                    {formatDate(doc.created_at || doc.date || doc.visit_date)}
                   </Text>
-                  <Text style={styles.docMeta}>
-                    {new Date(doc.visit_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} • {doc.source || 'Lab'}
-                  </Text>
                 </View>
-                <ChevronRight size={20} color={COLORS.text.secondary} />
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>No recent documents.</Text>
+              </View>
+              <ChevronRight size={20} color={COLORS.text.secondary} />
+            </TouchableOpacity>
+          ))}
+          
+          {recentDocs.length === 0 && (
+            <View style={styles.emptyRecent}>
+              <Text style={styles.emptyRecentText}>No recent documents found.</Text>
+            </View>
           )}
         </View>
       </ScrollView>
+
+      {/* Create Folder Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>New Folder</Text>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <X size={24} color={COLORS.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalLabel}>Give your folder a name to organize your records better.</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. Lab Reports, Prescriptions"
+              placeholderTextColor="#9CA3AF"
+              value={newFolderName}
+              onChangeText={setNewFolderName}
+              autoFocus={true}
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelBtn}
+                onPress={() => setIsModalVisible(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.createBtn, !newFolderName.trim() && styles.disabledBtn]}
+                onPress={handleCreateFolder}
+                disabled={isCreating || !newFolderName.trim()}
+              >
+                {isCreating ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text style={styles.createBtnText}>Create Folder</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <TouchableOpacity 
+        style={styles.fab}
+        onPress={() => router.push('/upload')}
+      >
+        <Plus size={30} color={COLORS.white} />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -179,52 +289,65 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFA',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFA',
+  },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     backgroundColor: COLORS.white,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.text.primary,
   },
-  logoCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  notificationBtn: {
-    padding: 4,
+  searchBtn: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
   },
   scrollContent: {
     padding: SPACING.lg,
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
-  heroSection: {
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginBottom: SPACING.xl,
+    ...SHADOWS.soft,
   },
-  title: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: COLORS.text.primary,
-    marginBottom: 8,
-  },
-  subtitle: {
+  searchText: {
+    flex: 1,
+    color: '#9CA3AF',
+    marginLeft: 12,
     fontSize: 15,
-    color: COLORS.text.secondary,
-    lineHeight: 22,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+  },
+  seeAll: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   folderGrid: {
     flexDirection: 'row',
@@ -233,7 +356,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   folderCard: {
-    width: '48%',
+    width: '47%',
     backgroundColor: COLORS.white,
     borderRadius: 24,
     padding: 20,
@@ -241,8 +364,8 @@ const styles = StyleSheet.create({
     ...SHADOWS.soft,
   },
   folderIconBox: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: 16,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
@@ -256,48 +379,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   folderCount: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.text.secondary,
-    fontWeight: '500',
-  },
-  emptyGrid: {
-    width: '100%',
-    padding: 40,
-    alignItems: 'center',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-  viewAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
   },
   docsList: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    paddingVertical: 8,
-    ...SHADOWS.soft,
+    gap: 12,
   },
-  docItem: {
+  docCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    ...SHADOWS.soft,
   },
   docIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -310,16 +409,115 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text.primary,
+    marginBottom: 4,
   },
   docMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  docMetaText: {
     fontSize: 12,
     color: COLORS.text.secondary,
-    marginTop: 2,
+  },
+  emptyRecent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyRecentText: {
+    color: COLORS.text.secondary,
+  },
+  emptyContainer: {
+    width: '100%',
+    padding: 20,
+    alignItems: 'center',
   },
   emptyText: {
+    color: COLORS.text.secondary,
+  },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.medium,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 24,
+    ...SHADOWS.medium,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+  },
+  modalLabel: {
     fontSize: 14,
     color: COLORS.text.secondary,
-    textAlign: 'center',
-    padding: 20,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: COLORS.text.primary,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text.secondary,
+  },
+  createBtn: {
+    flex: 2,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+  },
+  createBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  disabledBtn: {
+    backgroundColor: '#9CA3AF',
   },
 });

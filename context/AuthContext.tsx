@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { set401Callback } from '../services/api';
 
 interface User {
   id: string;
@@ -25,6 +26,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     loadStorageData();
+    set401Callback(() => {
+      signOut();
+    });
   }, []);
 
   const loadStorageData = async () => {
@@ -65,8 +69,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AsyncStorage.removeItem('user');
   };
 
+  const value = useMemo(() => ({
+    user,
+    token,
+    isLoading,
+    signIn,
+    signOut
+  }), [user, token, isLoading]);
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, signIn, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

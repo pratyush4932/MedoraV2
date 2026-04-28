@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
   Bell, 
@@ -8,7 +9,9 @@ import {
   QrCode, 
   ChevronRight, 
   FileText,
-  Sparkles
+  Sparkles,
+  Upload,
+  Hospital
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -17,7 +20,6 @@ import { recordService, aiService } from '../../services/api';
 export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const [recentRecords, setRecentRecords] = useState<any[]>([]);
   const [aiInsight, setAiInsight] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,21 +28,24 @@ export default function HomeScreen() {
     if (!user) return;
     if (!silent) setIsLoading(true);
     try {
-      const data = await recordService.getUserRecords(user.id);
+      const data = await recordService.getMyProfile();
       
-      // Flatten records
       let allRecords: any[] = [];
-      data.records_view.folders.forEach((f: any) => {
-        allRecords = [...allRecords, ...f.records];
+      
+      data?.records_view?.folders?.forEach((f: any) => {
+        if (f.records && Array.isArray(f.records)) {
+          allRecords = [...allRecords, ...f.records];
+        }
       });
 
-      // Sort and set recent
-      const sorted = [...allRecords].sort((a, b) => 
-        new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
-      );
-      setRecentRecords(sorted.slice(0, 2));
+      data?.hospital_view?.forEach((h: any) => {
+        h.visits?.forEach((v: any) => {
+          if (v.records && Array.isArray(v.records)) {
+            allRecords = [...allRecords, ...v.records];
+          }
+        });
+      });
 
-      // Generate AI Insights from all record summaries with actual content
       const summaries = allRecords
         .map(r => {
           let s = r.ai_summary;
@@ -68,24 +73,18 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    const hasProcessing = recentRecords.some(r => r.status === 'processing');
-    if (hasProcessing) {
-      const timer = setTimeout(() => fetchData(true), 3000);
-      return () => clearTimeout(timer);
+    if (user?.id) {
+      fetchData();
     }
-  }, [recentRecords]);
-
-  useEffect(() => {
-    fetchData();
-  }, [user]);
+  }, [user?.id]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    fetchData();
+    fetchData(true);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoCircle}>
@@ -101,6 +100,7 @@ export default function HomeScreen() {
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroSection}>
           <Text style={styles.welcomeText}>Welcome back,</Text>
@@ -119,7 +119,7 @@ export default function HomeScreen() {
         <View style={styles.quickActions}>
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/records')}
+            onPress={() => router.push('/records')}
           >
             <View style={styles.actionIconBox}>
               <FolderOpen size={24} color={COLORS.primary} />
@@ -129,12 +129,32 @@ export default function HomeScreen() {
 
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => router.push('/qr/generate')}
+            onPress={() => router.push('/qr')}
           >
             <View style={styles.actionIconBox}>
               <QrCode size={24} color={COLORS.primary} />
             </View>
             <Text style={styles.actionLabel}>Generate QR</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => router.push('/upload')}
+          >
+            <View style={styles.actionIconBox}>
+              <Upload size={24} color={COLORS.primary} />
+            </View>
+            <Text style={styles.actionLabel}>Upload</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => router.push('/hospitals')} 
+          >
+            <View style={styles.actionIconBox}>
+              <Hospital size={24} color={COLORS.primary} />
+            </View>
+            <Text style={styles.actionLabel}>Hospital</Text>
           </TouchableOpacity>
         </View>
 
@@ -158,43 +178,10 @@ export default function HomeScreen() {
           <Text style={styles.insightDescription}>
             {aiInsight?.overall_health_picture || 'Based on your recent records, your vital signs are within normal ranges.'}
           </Text>
+          {isLoading && !isRefreshing && (
+             <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 12 }} />
+          )}
         </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Records</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/records')}>
-            <Text style={styles.sectionLink}>View Full Archive</Text>
-          </TouchableOpacity>
-        </View>
-
-        {recentRecords.length > 0 ? (
-          recentRecords.map((record, index) => (
-            <TouchableOpacity 
-              key={record.id || index}
-              style={styles.recordItem}
-              onPress={() => router.push(`/summary/${record.id}`)}
-            >
-              <View style={styles.recordIconBox}>
-                <FileText size={20} color={COLORS.primary} />
-              </View>
-              <View style={styles.recordInfo}>
-                <Text style={styles.recordTitle}>
-                  {record.status === 'processing' ? 'Generating AI summary...' : (record.ai_summary?.reports?.[0] || record.file_type || 'Health Record')}
-                </Text>
-                <Text style={styles.recordDesc}>General checkup results and analysis.</Text>
-                <View style={styles.recordMeta}>
-                  <Text style={styles.recordDate}>{new Date(record.visit_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                  <Text style={styles.recordHospital}>{record.source || 'METROPOLITAN HOSPITAL'}</Text>
-                </View>
-              </View>
-              <ChevronRight size={20} color={COLORS.text.secondary} />
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyRecords}>
-            <Text style={styles.emptyText}>No recent records found.</Text>
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -236,7 +223,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: SPACING.lg,
-    paddingBottom: 100,
+    paddingBottom: 40,
   },
   heroSection: {
     marginBottom: SPACING.lg,
@@ -271,15 +258,17 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     marginBottom: SPACING.xl,
   },
   actionCard: {
-    flex: 1,
+    width: '48%',
     backgroundColor: COLORS.white,
     borderRadius: ROUNDING.lg,
     padding: SPACING.lg,
     alignItems: 'center',
+    marginBottom: SPACING.md,
     ...SHADOWS.soft,
   },
   actionIconBox: {
@@ -350,63 +339,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.text.secondary,
     lineHeight: 20,
-  },
-  recordItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: ROUNDING.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  recordIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  recordInfo: {
-    flex: 1,
-  },
-  recordTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-  recordDesc: {
-    fontSize: 12,
-    color: COLORS.text.secondary,
-    marginBottom: 8,
-  },
-  recordMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  recordDate: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-  recordHospital: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.text.secondary,
-  },
-  emptyRecords: {
-    padding: 32,
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: ROUNDING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderStyle: 'dashed',
-  },
-  emptyText: {
-    color: COLORS.text.secondary,
-    fontSize: 14,
   },
 });

@@ -64,8 +64,10 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="upload/index" options={{ presentation: 'modal', title: 'Upload Record', headerTintColor: COLORS.primary }} />
-      <Stack.Screen name="qr/generate" options={{ title: 'Share Health QR', headerTintColor: COLORS.primary }} />
-      <Stack.Screen name="summary/[id]" options={{ title: 'AI Health Summary', headerTintColor: COLORS.primary }} />
+      <Stack.Screen name="folder/[name]" options={{ headerShown: false }} />
+      <Stack.Screen name="facility/[id]/index" options={{ headerShown: false }} />
+      <Stack.Screen name="facility/[id]/[date]" options={{ headerShown: false }} />
+      <Stack.Screen name="summary/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
   );
