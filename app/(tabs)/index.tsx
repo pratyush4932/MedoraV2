@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, ActivityIndicator, Image, Pressable, Keyboard, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
-  Bell, 
   Search, 
   FolderOpen, 
   QrCode, 
-  ChevronRight, 
   FileText,
   Sparkles,
   Upload,
@@ -17,6 +15,61 @@ import {
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { recordService, aiService } from '../../services/api';
+import { LucideIcon } from 'lucide-react-native';
+
+interface AnimatedActionCardProps {
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+}
+
+function AnimatedActionCard({ icon: Icon, label, onPress }: AnimatedActionCardProps) {
+  const [animation] = useState(new Animated.Value(0));
+
+  const handleIn = () => {
+    Animated.timing(animation, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleOut = () => {
+    Animated.timing(animation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Pressable 
+      style={styles.actionCard}
+      onPress={onPress}
+      onHoverIn={handleIn}
+      onHoverOut={handleOut}
+      onPressIn={handleIn}
+      onPressOut={handleOut}
+    >
+      <View style={styles.actionIconBox}>
+        <View style={{ width: 24, height: 24 }}>
+          <Icon 
+            size={24} 
+            color={COLORS.primary} 
+          />
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: animation }]}>
+            <Icon 
+              size={24} 
+              color={COLORS.success} 
+              fill={COLORS.success}
+            />
+          </Animated.View>
+        </View>
+      </View>
+      <Text style={styles.actionLabel}>{label}</Text>
+    </Pressable>
+  );
+}
 
 export default function HomeScreen() {
   const { user, signOut } = useAuth();
@@ -24,6 +77,11 @@ export default function HomeScreen() {
   const [aiInsight, setAiInsight] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [folders, setFolders] = useState<any[]>([]);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [records, setRecords] = useState<any[]>([]);
 
   const fetchData = async (silent = false) => {
     if (!user) return;
@@ -31,21 +89,28 @@ export default function HomeScreen() {
     try {
       const data = await recordService.getMyProfile();
       
+      const userFolders = data?.records_view?.folders || [];
+      const userHospitals = data?.hospital_view || [];
+      
       let allRecords: any[] = [];
       
-      data?.records_view?.folders?.forEach((f: any) => {
+      userFolders.forEach((f: any) => {
         if (f.records && Array.isArray(f.records)) {
           allRecords = [...allRecords, ...f.records];
         }
       });
 
-      data?.hospital_view?.forEach((h: any) => {
+      userHospitals.forEach((h: any) => {
         h.visits?.forEach((v: any) => {
           if (v.records && Array.isArray(v.records)) {
             allRecords = [...allRecords, ...v.records];
           }
         });
       });
+
+      setFolders(userFolders);
+      setHospitals(userHospitals);
+      setRecords(allRecords);
 
       const summaries = allRecords
         .map(r => {
@@ -84,6 +149,21 @@ export default function HomeScreen() {
     fetchData(true);
   };
 
+  const getDocTitle = (doc: any) => {
+    let ai = doc.ai_summary;
+    if (typeof ai === 'string' && ai.startsWith('{')) {
+      try { ai = JSON.parse(ai); } catch (e) {}
+    }
+    if (ai?.fileName) return ai.fileName;
+    const reports = ai?.reports || doc.reports;
+    if (reports && Array.isArray(reports) && reports.length > 0) return reports[0];
+    return ai?.title || doc.record_name || doc.file_type || 'Medical Record';
+  };
+
+  const filteredFolders = folders.filter(f => f.name?.toLowerCase().includes(searchQuery.toLowerCase()) && f.name !== 'Personal');
+  const filteredHospitals = hospitals.filter(h => h.hospital_name?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredRecords = records.filter(r => getDocTitle(r).toLowerCase().includes(searchQuery.toLowerCase()));
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -94,8 +174,8 @@ export default function HomeScreen() {
           />
           <Text style={styles.brandName}>Medora</Text>
         </View>
-        <TouchableOpacity style={styles.notificationBtn}>
-          <Bell size={24} color={COLORS.secondary} />
+        <TouchableOpacity onPress={signOut} style={styles.logoutBtn}>
+          <LogOut size={20} color={COLORS.white} />
         </TouchableOpacity>
       </View>
 
@@ -103,15 +183,20 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.heroSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+        <Pressable 
+          style={{ flex: 1, minHeight: '100%' }}
+          onPress={() => {
+            Keyboard.dismiss();
+            if (searchQuery.length > 0) setSearchQuery('');
+          }}
+        >
+          <View style={[styles.heroSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
           <View>
             <Text style={styles.welcomeText}>Welcome back,</Text>
             <Text style={styles.userName}>{user?.name || 'Prithwi'}</Text>
           </View>
-          <TouchableOpacity onPress={signOut} style={{ padding: 8 }}>
-            <LogOut size={24} color={COLORS.primary} />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.searchContainer}>
@@ -120,49 +205,81 @@ export default function HomeScreen() {
             placeholder="Search records, labs, or providers..." 
             placeholderTextColor={COLORS.text.secondary + '80'}
             style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
 
-        <View style={styles.quickActions}>
-          <TouchableOpacity 
-            style={styles.actionCard}
+        {searchQuery.length > 0 ? (
+          <View style={styles.searchResults}>
+            {filteredFolders.length > 0 && (
+              <View style={styles.resultSection}>
+                <Text style={styles.resultHeader}>Folders</Text>
+                {filteredFolders.map((folder, i) => (
+                  <TouchableOpacity key={folder.id || i} style={styles.resultItem} onPress={() => router.push(`/folder/${folder.name}`)}>
+                    <FolderOpen size={20} color={COLORS.primary} />
+                    <Text style={styles.resultText}>{folder.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            
+            {filteredHospitals.length > 0 && (
+              <View style={styles.resultSection}>
+                <Text style={styles.resultHeader}>Hospitals</Text>
+                {filteredHospitals.map((hospital, i) => (
+                  <TouchableOpacity key={hospital.hospital_id || i} style={styles.resultItem} onPress={() => router.push(`/facility/${hospital.hospital_id}`)}>
+                    <Hospital size={20} color={COLORS.primary} />
+                    <Text style={styles.resultText}>{hospital.hospital_name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {filteredRecords.length > 0 && (
+              <View style={styles.resultSection}>
+                <Text style={styles.resultHeader}>Documents</Text>
+                {filteredRecords.map((record, i) => (
+                  <TouchableOpacity key={record.id || i} style={styles.resultItem} onPress={() => router.push(`/summary/${record.id}`)}>
+                    <FileText size={20} color={COLORS.primary} />
+                    <Text style={styles.resultText} numberOfLines={1}>{getDocTitle(record)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {filteredFolders.length === 0 && filteredHospitals.length === 0 && filteredRecords.length === 0 && (
+              <View style={styles.emptySearch}>
+                <Text style={styles.emptySearchText}>{`No results found for "${searchQuery}"`}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <>
+            <View style={styles.quickActions}>
+          <AnimatedActionCard 
+            icon={FolderOpen}
+            label="Records"
             onPress={() => router.push('/records')}
-          >
-            <View style={styles.actionIconBox}>
-              <FolderOpen size={24} color={COLORS.primary} />
-            </View>
-            <Text style={styles.actionLabel}>Records</Text>
-          </TouchableOpacity>
+          />
 
-          <TouchableOpacity 
-            style={styles.actionCard}
+          <AnimatedActionCard 
+            icon={QrCode}
+            label="Generate QR"
             onPress={() => router.push('/qr')}
-          >
-            <View style={styles.actionIconBox}>
-              <QrCode size={24} color={COLORS.primary} />
-            </View>
-            <Text style={styles.actionLabel}>Generate QR</Text>
-          </TouchableOpacity>
+          />
 
-          <TouchableOpacity 
-            style={styles.actionCard}
+          <AnimatedActionCard 
+            icon={Upload}
+            label="Upload"
             onPress={() => router.push('/upload')}
-          >
-            <View style={styles.actionIconBox}>
-              <Upload size={24} color={COLORS.primary} />
-            </View>
-            <Text style={styles.actionLabel}>Upload</Text>
-          </TouchableOpacity>
+          />
 
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => router.push('/hospitals')} 
-          >
-            <View style={styles.actionIconBox}>
-              <Hospital size={24} color={COLORS.primary} />
-            </View>
-            <Text style={styles.actionLabel}>Hospital</Text>
-          </TouchableOpacity>
+          <AnimatedActionCard 
+            icon={Hospital}
+            label="Hospital"
+            onPress={() => router.push('/hospitals')}
+          />
         </View>
 
         <View style={styles.sectionHeader}>
@@ -189,6 +306,9 @@ export default function HomeScreen() {
              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 12 }} />
           )}
         </View>
+        </>
+        )}
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -225,8 +345,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
   },
-  notificationBtn: {
-    padding: 4,
+  logoutBtn: {
+    backgroundColor: '#EF4444',
+    padding: 10,
+    borderRadius: ROUNDING.full,
+    ...SHADOWS.medium,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     padding: SPACING.lg,
@@ -346,5 +471,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.text.secondary,
     lineHeight: 20,
+  },
+  searchResults: {
+    marginBottom: SPACING.xl,
+  },
+  resultSection: {
+    marginBottom: SPACING.md,
+  },
+  resultHeader: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: SPACING.md,
+    borderRadius: ROUNDING.lg,
+    marginBottom: 8,
+    gap: 12,
+    ...SHADOWS.soft,
+  },
+  resultText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+    flex: 1,
+  },
+  emptySearch: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptySearchText: {
+    fontSize: 15,
+    color: COLORS.text.secondary,
   },
 });
