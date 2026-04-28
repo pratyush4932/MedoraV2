@@ -19,6 +19,46 @@ import { recordService, aiService } from '../../services/api';
 import { AnimatedCard } from '../../components/AnimatedCard';
 import { LinearGradient } from 'expo-linear-gradient';
 
+const LogoutButton = ({ onPress }: { onPress: () => void }) => {
+  const [animation] = useState(new Animated.Value(0));
+
+  const handleIn = () => {
+    Animated.timing(animation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleOut = () => {
+    Animated.timing(animation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onHoverIn={handleIn}
+      onHoverOut={handleOut}
+      onPressIn={handleIn}
+      onPressOut={handleOut}
+    >
+      <View style={[styles.logoutBtn, { backgroundColor: COLORS.error + '20', overflow: 'hidden' }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.error, opacity: animation }]} />
+        <View style={{ position: 'relative', width: 20, height: 20 }}>
+           <LogOut size={20} color={COLORS.error} style={{ position: 'absolute' }} />
+           <Animated.View style={{ opacity: animation, position: 'absolute' }}>
+             <LogOut size={20} color={COLORS.white} />
+           </Animated.View>
+        </View>
+      </View>
+    </Pressable>
+  );
+};
+
 export default function HomeScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
@@ -122,9 +162,7 @@ export default function HomeScreen() {
           />
           <Text style={styles.brandName}>Medora</Text>
         </View>
-        <TouchableOpacity onPress={signOut} style={styles.logoutBtn}>
-          <LogOut size={20} color={COLORS.white} />
-        </TouchableOpacity>
+        <LogoutButton onPress={signOut} />
       </View>
 
       <ScrollView 
@@ -332,16 +370,15 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   logoutBtn: {
-    backgroundColor: '#EF4444',
     padding: 10,
     borderRadius: ROUNDING.full,
-    ...SHADOWS.medium,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
     padding: SPACING.lg,
     paddingBottom: 40,
+    flexGrow: 1,
   },
   heroSection: {
     marginBottom: SPACING.lg,
