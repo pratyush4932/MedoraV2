@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
-import { View, Pressable, Animated, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
+import React from 'react';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  runOnJS
+} from 'react-native-reanimated';
 import { COLORS, ROUNDING } from '../constants/theme';
 
 interface AnimatedCardProps {
@@ -16,65 +24,83 @@ interface AnimatedCardProps {
   iconBoxChildren?: React.ReactNode;
 }
 
-export function AnimatedCard({ 
-  icon: Icon, 
-  iconSize = 24, 
-  children, 
-  onPress, 
-  style, 
+export function AnimatedCard({
+  icon: Icon,
+  iconSize = 24,
+  children,
+  onPress,
+  style,
   iconBoxStyle,
   iconColor = COLORS.primary,
-  fillColor = COLORS.success,
+  fillColor = COLORS.primary,
   borderRadius = ROUNDING.lg,
   iconBoxChildren
 }: AnimatedCardProps) {
-  const [animation] = useState(new Animated.Value(0));
+  const pressed = useSharedValue(0);
 
-  const handleIn = () => {
-    Animated.timing(animation, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-  };
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: withSpring(pressed.value ? 0.98 : 1, { damping: 10, stiffness: 200 }) },
+        { translateY: withSpring(pressed.value ? 2 : 0) }
+      ],
+      backgroundColor: withTiming(pressed.value ? COLORS.primary + '05' : COLORS.white),
+    };
+  });
 
-  const handleOut = () => {
-    Animated.timing(animation, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
+  const overlayStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(pressed.value ? 0.05 : 0),
+    };
+  });
+
+  const iconAnimStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: withSpring(pressed.value ? 1.1 : 1) }],
+    };
+  });
+
+  const tap = Gesture.Tap()
+    .onBegin(() => {
+      pressed.value = 1;
+    })
+    .onFinalize(() => {
+      pressed.value = 0;
+    })
+    .onEnd(() => {
+      if (onPress) {
+        runOnJS(onPress)();
+      }
+    });
 
   return (
-    <Pressable 
-      style={style}
-      onPress={onPress}
-      onHoverIn={handleIn}
-      onHoverOut={handleOut}
-      onPressIn={handleIn}
-      onPressOut={handleOut}
-    >
-      <Animated.View 
-        style={[
-          StyleSheet.absoluteFill, 
-          { 
-            backgroundColor: fillColor + '15', 
-            borderRadius: borderRadius,
-            opacity: animation 
-          }
-        ]} 
-      />
-      <View style={[iconBoxStyle, { position: 'relative' }]}>
-        <View style={{ width: iconSize, height: iconSize }}>
-          <Icon size={iconSize} color={iconColor} />
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: animation }]}>
-            <Icon size={iconSize} color={fillColor} fill={fillColor} />
+    <GestureDetector gesture={tap}>
+      <Animated.View style={[styles.card, style, animatedStyle, { borderRadius }]}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: fillColor,
+              borderRadius: borderRadius,
+            },
+            overlayStyle
+          ]}
+        />
+        <View style={[iconBoxStyle, { position: 'relative' }]}>
+          <Animated.View style={[{ width: iconSize, height: iconSize }, iconAnimStyle]}>
+            <Icon size={iconSize} color={iconColor} />
           </Animated.View>
+          {iconBoxChildren}
         </View>
-        {iconBoxChildren}
-      </View>
-      {children}
-    </Pressable>
+        {children}
+      </Animated.View>
+    </GestureDetector>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: COLORS.white,
+    overflow: 'hidden',
+  }
+});

@@ -11,30 +11,32 @@
     "ios": {
       "supportsTablet": true
     },
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#F8FAFA",
-        "foregroundImage": "./assets/images/android-icon-foreground.png"
+        "foregroundImage": "./assets/images/icon.png"
       },
       "package": "com.medora.patient",
       "edgeToEdgeEnabled": true
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#ffffff"
         }
       ],
       "expo-font",
@@ -43,6 +45,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "88a919a5-f246-4f85-87e5-4ed481ce2954"
+      }
     }
   }
 }

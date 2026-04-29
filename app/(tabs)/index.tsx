@@ -59,6 +59,8 @@ const LogoutButton = ({ onPress }: { onPress: () => void }) => {
   );
 };
 
+import Reanimated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+
 export default function HomeScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
@@ -178,30 +180,35 @@ export default function HomeScreen() {
             if (searchQuery.length > 0) setSearchQuery('');
           }}
         >
-          <View style={[styles.heroSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-          <View>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>{user?.name || 'Prithwi'}</Text>
-          </View>
-        </View>
+          <Reanimated.View 
+            entering={FadeInDown.delay(100).duration(600)}
+            style={[styles.heroSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+          >
+            <View>
+              <Text style={styles.welcomeText}>Welcome back,</Text>
+              <Text style={styles.userName}>{user?.name || 'Prithwi'}</Text>
+            </View>
+          </Reanimated.View>
 
-        <LinearGradient
-          colors={[COLORS.success, COLORS.primary, COLORS.success]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.searchGradientBorder}
-        >
-          <View style={styles.searchContainer}>
-            <SearchIcon size={20} color={COLORS.text.secondary} style={styles.searchIcon} />
-            <TextInput 
-              placeholder="Search records, labs, or providers..." 
-              placeholderTextColor={COLORS.text.secondary + '80'}
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-        </LinearGradient>
+          <Reanimated.View entering={FadeInDown.delay(200).duration(600)}>
+            <LinearGradient
+              colors={[COLORS.success, COLORS.primary, COLORS.success]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.searchGradientBorder}
+            >
+              <View style={styles.searchContainer}>
+                <SearchIcon size={20} color={COLORS.text.secondary} style={styles.searchIcon} />
+                <TextInput 
+                  placeholder="Search records, labs, or providers..." 
+                  placeholderTextColor={COLORS.text.secondary + '80'}
+                  style={styles.searchInput}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+            </LinearGradient>
+          </Reanimated.View>
 
         {searchQuery.length > 0 ? (
           <View style={styles.searchResults}>
@@ -264,96 +271,101 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.quickActions}>
-          <AnimatedCard 
-            icon={FolderOpen}
-            label="Records"
-            style={styles.actionCard}
-            iconBoxStyle={styles.actionIconBox}
-            onPress={() => router.push('/records')}
-          >
-            <Text style={styles.actionLabel}>Records</Text>
-          </AnimatedCard>
+            <Reanimated.View 
+              entering={FadeInDown.delay(300).duration(600)}
+              style={styles.quickActions}
+            >
+              <AnimatedCard 
+                icon={FolderOpen}
+                label="Records"
+                style={styles.actionCard}
+                iconBoxStyle={styles.actionIconBox}
+                onPress={() => router.push('/records')}
+              >
+                <Text style={styles.actionLabel}>Records</Text>
+              </AnimatedCard>
 
-          <AnimatedCard 
-            icon={QrCode}
-            label="Generate QR"
-            style={styles.actionCard}
-            iconBoxStyle={styles.actionIconBox}
-            onPress={() => router.push('/qr')}
-          >
-            <Text style={styles.actionLabel}>Generate QR</Text>
-          </AnimatedCard>
+              <AnimatedCard 
+                icon={QrCode}
+                label="Generate QR"
+                style={styles.actionCard}
+                iconBoxStyle={styles.actionIconBox}
+                onPress={() => router.push('/qr')}
+              >
+                <Text style={styles.actionLabel}>Generate QR</Text>
+              </AnimatedCard>
 
-          <AnimatedCard 
-            icon={Upload}
-            label="Upload"
-            style={styles.actionCard}
-            iconBoxStyle={styles.actionIconBox}
-            onPress={() => router.push('/upload')}
-          >
-            <Text style={styles.actionLabel}>Upload</Text>
-          </AnimatedCard>
+              <AnimatedCard 
+                icon={Upload}
+                label="Upload"
+                style={styles.actionCard}
+                iconBoxStyle={styles.actionIconBox}
+                onPress={() => router.push('/upload')}
+              >
+                <Text style={styles.actionLabel}>Upload</Text>
+              </AnimatedCard>
 
-          <AnimatedCard 
-            icon={Hospital}
-            label="Hospital"
-            style={styles.actionCard}
-            iconBoxStyle={styles.actionIconBox}
-            onPress={() => router.push('/hospitals')}
-          >
-            <Text style={styles.actionLabel}>Hospital</Text>
-          </AnimatedCard>
-        </View>
+              <AnimatedCard 
+                icon={Hospital}
+                label="Hospital"
+                style={styles.actionCard}
+                iconBoxStyle={styles.actionIconBox}
+                onPress={() => router.push('/hospitals')}
+              >
+                <Text style={styles.actionLabel}>Hospital</Text>
+              </AnimatedCard>
+            </Reanimated.View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Smart Insights</Text>
-          <TouchableOpacity>
-            <Text style={styles.sectionLink}>Last 24 Hours</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.insightsCard}>
-          <View style={styles.insightHeader}>
-            <View style={styles.insightIconCircle}>
-              <Sparkles size={18} color={COLORS.primary} />
-            </View>
-            <View style={styles.insightHeaderText}>
-              <Text style={styles.insightType}>AI ANALYSIS</Text>
-              <Text style={styles.insightUpdateStatus}>Updated just now</Text>
-            </View>
-          </View>
-          
-          <Text style={styles.insightTitle}>
-            {aiInsight ? 'Longitudinal Health Overview' : 'All systems look good'}
-          </Text>
-          
-          <Text style={styles.insightDescription}>
-            {aiInsight?.overall_health_picture || 'Based on your recent records, your vital signs are within normal ranges.'}
-          </Text>
-
-          {aiInsight?.identified_patterns && aiInsight.identified_patterns.length > 0 && (
-            <View style={styles.patternsContainer}>
-              <Text style={styles.patternsLabel}>Key Observations:</Text>
-              <View style={styles.patternsGrid}>
-                {aiInsight.identified_patterns.map((pattern: string, idx: number) => (
-                  <View key={idx} style={styles.patternChip}>
-                    <View style={styles.patternDot} />
-                    <Text style={styles.patternText}>{pattern}</Text>
-                  </View>
-                ))}
+            <Reanimated.View entering={FadeInUp.delay(400).duration(600)}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Smart Insights</Text>
+                <TouchableOpacity>
+                  <Text style={styles.sectionLink}>Last 24 Hours</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          )}
 
-          {isLoading && !isRefreshing && (
-             <View style={styles.insightLoading}>
-               <ActivityIndicator size="small" color={COLORS.primary} />
-               <Text style={styles.insightLoadingText}>Analyzing records...</Text>
-             </View>
-          )}
-        </View>
-        </>
+              <View style={styles.insightsCard}>
+                <View style={styles.insightHeader}>
+                  <View style={styles.insightIconCircle}>
+                    <Sparkles size={18} color={COLORS.primary} />
+                  </View>
+                  <View style={styles.insightHeaderText}>
+                    <Text style={styles.insightType}>AI ANALYSIS</Text>
+                    <Text style={styles.insightUpdateStatus}>Updated just now</Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.insightTitle}>
+                  {aiInsight ? 'Longitudinal Health Overview' : 'All systems look good'}
+                </Text>
+                
+                <Text style={styles.insightDescription}>
+                  {aiInsight?.overall_health_picture || 'Based on your recent records, your vital signs are within normal ranges.'}
+                </Text>
+
+                {aiInsight?.identified_patterns && aiInsight.identified_patterns.length > 0 && (
+                  <View style={styles.patternsContainer}>
+                    <Text style={styles.patternsLabel}>Key Observations:</Text>
+                    <View style={styles.patternsGrid}>
+                      {aiInsight.identified_patterns.map((pattern: string, idx: number) => (
+                        <View key={idx} style={styles.patternChip}>
+                          <View style={styles.patternDot} />
+                          <Text style={styles.patternText}>{pattern}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {isLoading && !isRefreshing && (
+                   <View style={styles.insightLoading}>
+                     <ActivityIndicator size="small" color={COLORS.primary} />
+                     <Text style={styles.insightLoadingText}>Analyzing records...</Text>
+                   </View>
+                )}
+              </View>
+            </Reanimated.View>
+          </>
         )}
         </Pressable>
       </ScrollView>

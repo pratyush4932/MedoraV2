@@ -8,7 +8,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '../context/AuthContext';
-import { COLORS } from '../constants/theme';
+import { COLORS, SHADOWS } from '../constants/theme';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -19,40 +19,34 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   const router = useRouter();
   
   const [minTimePassed, setMinTimePassed] = useState(false);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(10)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const textFadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimePassed(true);
-    }, 5000);
+    }, 4000); // Reduced slightly for better feel
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (!fontsLoaded || isLoading || !minTimePassed) {
-      // Pulsate scale animation
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(scaleAnim, {
-            toValue: 1.05,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Fade in and slide up
+    if (fontsLoaded) {
+      // Hide splash screen as soon as we are ready to show our custom animation
+      SplashScreen.hideAsync();
+      
+      // Parallel animation for a premium entrance
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
@@ -60,9 +54,15 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
           duration: 1000,
           useNativeDriver: true,
         }),
+        // Unified text fade in
+        Animated.timing(textFadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
       ]).start();
     }
-  }, [fontsLoaded, isLoading, minTimePassed]);
+  }, [fontsLoaded]);
 
   useEffect(() => {
     if (!fontsLoaded || isLoading || !minTimePassed) return;
@@ -78,12 +78,6 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
       router.replace('/(tabs)');
     }
   }, [user, isLoading, segments, fontsLoaded, minTimePassed]);
-
-  useEffect(() => {
-    if (fontsLoaded && !isLoading && minTimePassed) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, isLoading, minTimePassed]);
 
   useEffect(() => {
     const backAction = () => {
@@ -103,33 +97,54 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
 
   if (!fontsLoaded || isLoading || !minTimePassed) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: COLORS.background 
+      }}>
         <Animated.View style={{ 
           alignItems: 'center', 
           opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
+          transform: [
+            { scale: scaleAnim },
+            { translateY: slideAnim }
+          ]
         }}>
-          <Animated.Image 
-            source={require('../assets/images/logo.png')} 
-            style={{ 
-              width: 140, 
-              height: 140, 
-              borderRadius: 32, 
-              transform: [{ scale: scaleAnim }] 
-            }} 
-            resizeMode="contain"
-          />
-          <Animated.Text style={{ 
-            marginTop: 20, 
-            fontSize: 32, 
-            fontWeight: '800', 
-            color: COLORS.primary,
-            letterSpacing: 2,
-            textTransform: 'uppercase'
+          <View style={{
+            marginBottom: 24,
+            justifyContent: 'center',
+            alignItems: 'center',
           }}>
-            Medora
-          </Animated.Text>
-          <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 40 }} />
+            <Image 
+              source={require('../assets/images/logo.png')} 
+              style={{ 
+                width: 160, 
+                height: 160, 
+              }} 
+              resizeMode="contain"
+            />
+          </View>
+          
+          <Animated.View style={{ 
+            alignItems: 'center',
+            opacity: textFadeAnim,
+          }}>
+            <Text style={{ 
+              fontSize: 48, 
+              fontWeight: '900', 
+              color: COLORS.primary,
+              letterSpacing: -1
+            }}>
+              Medora
+            </Text>
+          </Animated.View>
+
+          <ActivityIndicator 
+            size="small" 
+            color={COLORS.primary} 
+            style={{ marginTop: 60, opacity: 0.3 }} 
+          />
         </Animated.View>
       </View>
     );
@@ -149,6 +164,8 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   );
 }
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
@@ -156,10 +173,12 @@ export default function RootLayout() {
   });
 
   return (
-    <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <RootLayoutNav fontsLoaded={loaded} />
-      </ThemeProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <RootLayoutNav fontsLoaded={loaded} />
+        </ThemeProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -34,6 +34,8 @@ import { recordService } from '../../services/api';
 import { AnimatedCard } from '../../components/AnimatedCard';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
+
 export default function RecordsScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -42,7 +44,6 @@ export default function RecordsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Create Folder Modal State
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -204,9 +205,12 @@ export default function RecordsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+      <Animated.View 
+        entering={FadeInDown.duration(400)}
+        style={styles.header}
+      >
         <Text style={styles.headerTitle}>Medical Records</Text>
-      </View>
+      </Animated.View>
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -221,58 +225,65 @@ export default function RecordsScreen() {
             if (searchQuery.length > 0) setSearchQuery('');
           }}
         >
-        <LinearGradient
-          colors={[COLORS.success, COLORS.primary, COLORS.success]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.searchGradientBorder}
-        >
-          <View style={styles.searchBar}>
-            <Search size={20} color="#9CA3AF" />
-            <TextInput
-              style={styles.searchText}
-              placeholder="Search reports, labs, doctors..."
-              placeholderTextColor="#9CA3AF"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-        </LinearGradient>
+        <Animated.View entering={FadeInDown.delay(100).duration(600)}>
+          <LinearGradient
+            colors={[COLORS.success, COLORS.primary, COLORS.success]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.searchGradientBorder}
+          >
+            <View style={styles.searchBar}>
+              <Search size={20} color="#9CA3AF" />
+              <TextInput
+                style={styles.searchText}
+                placeholder="Search reports, labs, doctors..."
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </LinearGradient>
+        </Animated.View>
 
         {searchQuery.length === 0 && (
-          <View style={styles.sectionHeader}>
+          <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Folders</Text>
             <TouchableOpacity onPress={() => setIsModalVisible(true)}>
               <Text style={styles.seeAll}>Create New</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         )}
 
         {(searchQuery.length > 0 ? filteredFolders.length > 0 : true) && (
-          <View style={styles.folderGrid}>
+          <Animated.View layout={Layout.springify()} style={styles.folderGrid}>
             {filteredFolders.map((folder, index) => (
-            <AnimatedCard 
-              key={folder.id || index} 
-              icon={Folder}
-              iconSize={28}
-              style={styles.folderCard}
-              iconBoxStyle={styles.folderIconBox}
-              onPress={() => router.push(`/folder/${folder.name}`)}
-              borderRadius={24}
-              iconBoxChildren={null}
+            <Animated.View 
+              key={folder.id || index}
+              entering={FadeInUp.delay(300 + index * 50).duration(500)}
+              style={styles.folderCardContainer}
             >
-              <TouchableOpacity 
-                style={styles.deleteFolderBtn}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDeleteFolder(folder.id, folder.name);
-                }}
+              <AnimatedCard 
+                icon={Folder}
+                iconSize={28}
+                style={styles.folderCard}
+                iconBoxStyle={styles.folderIconBox}
+                onPress={() => router.push(`/folder/${folder.name}`)}
+                borderRadius={24}
+                iconBoxChildren={null}
               >
-                <Trash2 size={16} color="#EF4444" />
-              </TouchableOpacity>
-              <Text style={styles.folderName} numberOfLines={1}>{folder.name || 'Untitled'}</Text>
-              <Text style={styles.folderCount}>{folder.records?.length || 0} Files</Text>
-            </AnimatedCard>
+                <TouchableOpacity 
+                  style={styles.deleteFolderBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteFolder(folder.id, folder.name);
+                  }}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                </TouchableOpacity>
+                <Text style={styles.folderName} numberOfLines={1}>{folder.name || 'Untitled'}</Text>
+                <Text style={styles.folderCount}>{folder.records?.length || 0} Files</Text>
+              </AnimatedCard>
+            </Animated.View>
           ))}
           {filteredFolders.length === 0 && searchQuery.length > 0 && (
             <View style={styles.emptyContainer}>
@@ -284,52 +295,56 @@ export default function RecordsScreen() {
                <Text style={styles.emptyText}>No folders created.</Text>
             </View>
           )}
-        </View>
+        </Animated.View>
         )}
 
         {searchQuery.length === 0 && (
-          <View style={styles.sectionHeader}>
+          <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Documents</Text>
             <TouchableOpacity onPress={() => {}}>
               <Text style={styles.seeAll}>See All</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         )}
 
         {(searchQuery.length > 0 ? filteredRecentDocs.length > 0 : true) && (
-          <View style={styles.docsList}>
+          <Animated.View layout={Layout.springify()} style={styles.docsList}>
             {filteredRecentDocs.map((doc, index) => (
-            <AnimatedCard 
-              key={doc.id || index} 
-              icon={FileText}
-              iconSize={22}
-              style={styles.docCard}
-              iconBoxStyle={styles.docIconBox}
-              onPress={() => router.push(`/summary/${doc.id}`)}
-              borderRadius={20}
+            <Animated.View
+              key={doc.id || index}
+              entering={FadeInUp.delay(500 + index * 50).duration(500)}
             >
-              <View style={styles.docInfo}>
-                <Text style={styles.docTitle} numberOfLines={1}>
-                  {getDocTitle(doc)}
-                </Text>
-                <View style={styles.docMeta}>
-                  <Clock size={12} color={COLORS.text.secondary} />
-                  <Text style={styles.docMetaText}>
-                    {formatDate(doc.created_at || doc.date || doc.visit_date)}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.deleteDocBtn}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDeleteRecord(doc.id, getDocTitle(doc));
-                }}
+              <AnimatedCard 
+                icon={FileText}
+                iconSize={22}
+                style={styles.docCard}
+                iconBoxStyle={styles.docIconBox}
+                onPress={() => router.push(`/summary/${doc.id}`)}
+                borderRadius={20}
               >
-                <Trash2 size={18} color="#9CA3AF" />
-              </TouchableOpacity>
-              <ChevronRight size={20} color={COLORS.text.secondary} />
-            </AnimatedCard>
+                <View style={styles.docInfo}>
+                  <Text style={styles.docTitle} numberOfLines={1}>
+                    {getDocTitle(doc)}
+                  </Text>
+                  <View style={styles.docMeta}>
+                    <Clock size={12} color={COLORS.text.secondary} />
+                    <Text style={styles.docMetaText}>
+                      {formatDate(doc.created_at || doc.date || doc.visit_date)}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  style={styles.deleteDocBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteRecord(doc.id, getDocTitle(doc));
+                  }}
+                >
+                  <Trash2 size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+                <ChevronRight size={20} color={COLORS.text.secondary} />
+              </AnimatedCard>
+            </Animated.View>
           ))}
           
           {filteredRecentDocs.length === 0 && searchQuery.length > 0 && (
@@ -342,7 +357,7 @@ export default function RecordsScreen() {
               <Text style={styles.emptyRecentText}>No recent documents found.</Text>
             </View>
           )}
-        </View>
+        </Animated.View>
         )}
         </Pressable>
       </ScrollView>
@@ -478,14 +493,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.xl,
   },
-  folderCard: {
+  folderCardContainer: {
     width: '47%',
+    marginBottom: 16,
+  },
+  folderCard: {
     backgroundColor: COLORS.white,
     borderRadius: 24,
     padding: 20,
-    marginBottom: 16,
     ...SHADOWS.soft,
     position: 'relative',
+    width: '100%',
   },
   folderIconBox: {
     width: 52,
