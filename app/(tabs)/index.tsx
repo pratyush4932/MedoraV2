@@ -340,17 +340,21 @@ export default function HomeScreen() {
                 </Text>
                 
                 <Text style={styles.insightDescription}>
-                  {aiInsight?.overall_health_picture || 'Based on your recent records, your vital signs are within normal ranges.'}
+                  {aiInsight?.overall_health_picture 
+                    ? (Array.isArray(aiInsight.overall_health_picture) 
+                        ? aiInsight.overall_health_picture.join('\n') 
+                        : aiInsight.overall_health_picture)
+                    : 'Based on your recent records, your vital signs are within normal ranges.'}
                 </Text>
 
                 {aiInsight?.identified_patterns && aiInsight.identified_patterns.length > 0 && (
                   <View style={styles.patternsContainer}>
                     <Text style={styles.patternsLabel}>Key Observations:</Text>
                     <View style={styles.patternsGrid}>
-                      {aiInsight.identified_patterns.map((pattern: string, idx: number) => (
+                      {aiInsight.identified_patterns.map((item: any, idx: number) => (
                         <View key={idx} style={styles.patternChip}>
                           <View style={styles.patternDot} />
-                          <Text style={styles.patternText}>{pattern}</Text>
+                          <Text style={styles.patternText}>{item?.pattern || item}</Text>
                         </View>
                       ))}
                     </View>
