@@ -2,7 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { AlertCircle, CheckCircle2, Clock, FileUp, Folder, FolderPlus, Sparkles, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/common/Button';
 import { COLORS, ROUNDING, SHADOWS, SPACING } from '../../constants/theme';
@@ -242,148 +242,154 @@ export default function UploadScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Text style={styles.title}>Add New Record</Text>
-          <Text style={styles.subtitle}>Upload your medical reports or prescriptions</Text>
-        </View>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.title}>Add New Record</Text>
+            <Text style={styles.subtitle}>Upload your medical reports or prescriptions</Text>
+          </View>
 
-        <TouchableOpacity
-          style={[styles.dropZone, file && styles.dropZoneActive]}
-          onPress={handlePickFile}
-          disabled={isUploading || isProcessingAI}
-        >
-          {file ? (
-            <View style={styles.fileInfo}>
-              <FileUp size={32} color={COLORS.primary} />
-              <Text style={styles.fileName}>{file.name}</Text>
-              <Text style={styles.fileSize}>{(file.size / 1024 / 1024).toFixed(2)} MB</Text>
-              {!isUploading && !isProcessingAI && (
-                <TouchableOpacity onPress={() => setFile(null)} style={styles.removeBtn}>
-                  <X size={20} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            <View style={styles.emptyDropZone}>
-              <View style={styles.iconCircle}>
+          <TouchableOpacity
+            style={[styles.dropZone, file && styles.dropZoneActive]}
+            onPress={handlePickFile}
+            disabled={isUploading || isProcessingAI}
+          >
+            {file ? (
+              <View style={styles.fileInfo}>
                 <FileUp size={32} color={COLORS.primary} />
-              </View>
-              <Text style={styles.dropZoneTitle}>Tap to select a file</Text>
-              <Text style={styles.dropZoneSubtitle}>PDF or Images up to 10MB</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {!isUploading && !isProcessingAI && status !== 'success' && (
-          <View style={styles.folderSection}>
-            <Text style={styles.sectionLabel}>Save to Folder</Text>
-            <View style={styles.folderChoiceRow}>
-              <TouchableOpacity
-                style={[styles.folderChoice, !isNewFolder && styles.folderChoiceActive]}
-                onPress={() => setIsNewFolder(false)}
-              >
-                <Folder size={20} color={!isNewFolder ? COLORS.primary : COLORS.text.secondary} />
-                <Text style={[styles.folderChoiceText, !isNewFolder && styles.folderChoiceTextActive]}>Existing</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.folderChoice, isNewFolder && styles.folderChoiceActive]}
-                onPress={() => setIsNewFolder(true)}
-              >
-                <FolderPlus size={20} color={isNewFolder ? COLORS.primary : COLORS.text.secondary} />
-                <Text style={[styles.folderChoiceText, isNewFolder && styles.folderChoiceTextActive]}>New Folder</Text>
-              </TouchableOpacity>
-            </View>
-
-            {isNewFolder ? (
-              <TextInput
-                style={styles.textInput}
-                placeholder="Folder Name (e.g., Blood Reports)"
-                value={newFolderName}
-                onChangeText={setNewFolderName}
-                placeholderTextColor={COLORS.text.secondary}
-              />
-            ) : (
-              <View style={styles.foldersList}>
-                {folders.length > 0 ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.foldersScroll}>
-                    {folders.map((f) => (
-                      <TouchableOpacity
-                        key={f.id}
-                        style={[styles.folderTag, selectedFolderId === f.id && styles.folderTagActive]}
-                        onPress={() => setSelectedFolderId(f.id)}
-                      >
-                        <Text style={[styles.folderTagText, selectedFolderId === f.id && styles.folderTagTextActive]}>
-                          {f.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                ) : (
-                  <Text style={styles.noFoldersText}>No folders yet. Create a new one!</Text>
+                <Text style={styles.fileName}>{file.name}</Text>
+                <Text style={styles.fileSize}>{(file.size / 1024 / 1024).toFixed(2)} MB</Text>
+                {!isUploading && !isProcessingAI && (
+                  <TouchableOpacity onPress={() => setFile(null)} style={styles.removeBtn}>
+                    <X size={20} color={COLORS.text.secondary} />
+                  </TouchableOpacity>
                 )}
               </View>
+            ) : (
+              <View style={styles.emptyDropZone}>
+                <View style={styles.iconCircle}>
+                  <FileUp size={32} color={COLORS.primary} />
+                </View>
+                <Text style={styles.dropZoneTitle}>Tap to select a file</Text>
+                <Text style={styles.dropZoneSubtitle}>PDF or Images up to 10MB</Text>
+              </View>
             )}
-          </View>
-        )}
+          </TouchableOpacity>
 
-        {/* Progress bar — shown during upload and AI processing */}
-        {(isUploading || isProcessingAI) && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${Math.round(uploadProgress * 100)}%` }]} />
+          {!isUploading && !isProcessingAI && status !== 'success' && (
+            <View style={styles.folderSection}>
+              <Text style={styles.sectionLabel}>Save to Folder</Text>
+              <View style={styles.folderChoiceRow}>
+                <TouchableOpacity
+                  style={[styles.folderChoice, !isNewFolder && styles.folderChoiceActive]}
+                  onPress={() => setIsNewFolder(false)}
+                >
+                  <Folder size={20} color={!isNewFolder ? COLORS.primary : COLORS.text.secondary} />
+                  <Text style={[styles.folderChoiceText, !isNewFolder && styles.folderChoiceTextActive]}>Existing</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.folderChoice, isNewFolder && styles.folderChoiceActive]}
+                  onPress={() => setIsNewFolder(true)}
+                >
+                  <FolderPlus size={20} color={isNewFolder ? COLORS.primary : COLORS.text.secondary} />
+                  <Text style={[styles.folderChoiceText, isNewFolder && styles.folderChoiceTextActive]}>New Folder</Text>
+                </TouchableOpacity>
+              </View>
+
+              {isNewFolder ? (
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Folder Name (e.g., Blood Reports)"
+                  value={newFolderName}
+                  onChangeText={setNewFolderName}
+                  placeholderTextColor={COLORS.text.secondary}
+                />
+              ) : (
+                <View style={styles.foldersList}>
+                  {folders.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.foldersScroll}>
+                      {folders.map((f) => (
+                        <TouchableOpacity
+                          key={f.id}
+                          style={[styles.folderTag, selectedFolderId === f.id && styles.folderTagActive]}
+                          onPress={() => setSelectedFolderId(f.id)}
+                        >
+                          <Text style={[styles.folderTagText, selectedFolderId === f.id && styles.folderTagTextActive]}>
+                            {f.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  ) : (
+                    <Text style={styles.noFoldersText}>No folders yet. Create a new one!</Text>
+                  )}
+                </View>
+              )}
             </View>
-            <View style={styles.progressLabelRow}>
-              {isProcessingAI && <Sparkles size={14} color={COLORS.primary} />}
-              {isUploading && <Clock size={14} color={COLORS.primary} />}
-              <Text style={styles.progressText}>
-                {isUploading
-                  ? `Uploading... ${Math.round(uploadProgress * 100)}%`
-                  : aiStatusText}
+          )}
+
+          {/* Progress bar — shown during upload and AI processing */}
+          {(isUploading || isProcessingAI) && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${Math.round(uploadProgress * 100)}%` }]} />
+              </View>
+              <View style={styles.progressLabelRow}>
+                {isProcessingAI && <Sparkles size={14} color={COLORS.primary} />}
+                {isUploading && <Clock size={14} color={COLORS.primary} />}
+                <Text style={styles.progressText}>
+                  {isUploading
+                    ? `Uploading... ${Math.round(uploadProgress * 100)}%`
+                    : aiStatusText}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {status === 'success' && (
+            <View style={styles.successBox}>
+              <CheckCircle2 size={32} color={COLORS.success} />
+              <Text style={styles.successTitle}>Upload Complete!</Text>
+              <View style={styles.detectedNameCard}>
+                <Sparkles size={20} color={COLORS.primary} />
+                <Text style={styles.detectedNameText}>{detectedTitle || 'Medical Record'}</Text>
+              </View>
+              <Text style={styles.successSubtitle}>AI summary will appear shortly in your records.</Text>
+            </View>
+          )}
+
+          {status === 'error' && (
+            <View style={styles.statusBox}>
+              <AlertCircle size={24} color={COLORS.error} />
+              <Text style={[styles.statusText, { color: COLORS.error, flexShrink: 1 }]}>
+                {errorMessage || 'Upload Failed. Try again.'}
               </Text>
             </View>
-          </View>
-        )}
-
-        {status === 'success' && (
-          <View style={styles.successBox}>
-            <CheckCircle2 size={32} color={COLORS.success} />
-            <Text style={styles.successTitle}>Upload Complete!</Text>
-            <View style={styles.detectedNameCard}>
-              <Sparkles size={20} color={COLORS.primary} />
-              <Text style={styles.detectedNameText}>{detectedTitle || 'Medical Record'}</Text>
-            </View>
-            <Text style={styles.successSubtitle}>AI summary will appear shortly in your records.</Text>
-          </View>
-        )}
-
-        {status === 'error' && (
-          <View style={styles.statusBox}>
-            <AlertCircle size={24} color={COLORS.error} />
-            <Text style={[styles.statusText, { color: COLORS.error, flexShrink: 1 }]}>
-              {errorMessage || 'Upload Failed. Try again.'}
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.footer}>
-          <Button
-            title={isUploading ? 'Uploading...' : isProcessingAI ? 'Analyzing...' : 'Upload & Analyze'}
-            onPress={handleUpload}
-            isLoading={isUploading || isProcessingAI}
-            disabled={
-              !file ||
-              status === 'success' ||
-              isProcessingAI ||
-              (isNewFolder ? !newFolderName.trim() : !selectedFolderId)
-            }
-            style={styles.uploadBtn}
-          />
-          {!isUploading && !isProcessingAI && (
-            <Button title="Cancel" onPress={() => router.back()} variant="ghost" />
           )}
-        </View>
-      </ScrollView>
+
+          <View style={styles.footer}>
+            <Button
+              title={isUploading ? 'Uploading...' : isProcessingAI ? 'Analyzing...' : 'Upload & Analyze'}
+              onPress={handleUpload}
+              isLoading={isUploading || isProcessingAI}
+              disabled={
+                !file ||
+                status === 'success' ||
+                isProcessingAI ||
+                (isNewFolder ? !newFolderName.trim() : !selectedFolderId)
+              }
+              style={styles.uploadBtn}
+            />
+            {!isUploading && !isProcessingAI && (
+              <Button title="Cancel" onPress={() => router.back()} variant="ghost" />
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

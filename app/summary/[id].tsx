@@ -63,38 +63,11 @@ const AlertCard = React.memo(({ items }: { items: string[] }) => {
 });
 
 const FindingsCard = React.memo(({ items }: { items: any[] }) => {
+  const [expanded, setExpanded] = useState(false);
   if (!items || items.length === 0) return null;
   
-  return (
-    <View style={styles.section}>
-      <SectionHeader icon={Activity} title="Key Findings" color="#F59E0B" />
-      <View style={styles.card}>
-        {items.map((item, index) => (
-          <View key={index} style={styles.listItem}>
-            <View 
-              style={[
-                styles.listDot, 
-                { backgroundColor: item.type === 'warning' ? '#F59E0B' : '#10B981' }
-              ]} 
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={[
-                styles.listText,
-                item.type === 'warning' && { color: '#92400E', fontWeight: '700' }
-              ]}>
-                {item.text}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-});
-
-const SummaryCard = React.memo(({ text }: { text: string }) => {
-  const [expanded, setExpanded] = useState(false);
-  if (!text) return null;
+  const urgent = items.filter(i => i.isAbnormal || i.type === 'warning');
+  const others = items.filter(i => !urgent.includes(i));
   
   const toggleExpanded = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -103,25 +76,58 @@ const SummaryCard = React.memo(({ text }: { text: string }) => {
 
   return (
     <View style={styles.section}>
+      <SectionHeader icon={Activity} title="Key Findings" color="#F59E0B" />
+      <View style={styles.card}>
+        {/* Abnormal Findings First */}
+        {urgent.map((item, index) => (
+          <View key={`urgent-${index}`} style={styles.listItem}>
+            <View style={[styles.listDot, { backgroundColor: '#F59E0B' }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.listText, { color: '#92400E', fontWeight: '700' }]}>
+                {item.text}
+              </Text>
+            </View>
+          </View>
+        ))}
+
+        {/* Regular Findings (Collapsible) */}
+        {expanded && others.map((item, index) => (
+          <View key={`other-${index}`} style={styles.listItem}>
+            <View style={[styles.listDot, { backgroundColor: '#10B981' }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listText}>{item.text}</Text>
+            </View>
+          </View>
+        ))}
+
+        {others.length > 0 && (
+          <TouchableOpacity onPress={toggleExpanded} style={styles.expandButton}>
+            <Text style={styles.expandButtonText}>
+              {expanded ? "Show Less" : `View ${others.length} More Findings`}
+            </Text>
+            {expanded ? <ChevronUp size={14} color={COLORS.primary} /> : <ChevronDown size={14} color={COLORS.primary} />}
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+});
+
+const SummaryCard = React.memo(({ text }: { text: string }) => {
+  if (!text) return null;
+  
+  const formattedText = Array.isArray(text) 
+    ? text.map(line => `• ${line}`).join('\n') 
+    : text.split('\n').map(line => line.trim().startsWith('•') || line.trim().startsWith('-') ? line : `• ${line}`).join('\n');
+
+  return (
+    <View style={styles.section}>
       <SectionHeader icon={Sparkles} title="AI Summary" color={COLORS.primary} />
-      <TouchableOpacity 
-        activeOpacity={0.9} 
-        onPress={toggleExpanded} 
-        style={styles.card}
-      >
-        <Text 
-          style={styles.summaryText} 
-          numberOfLines={expanded ? undefined : 3}
-        >
-          {text}
+      <View style={styles.card}>
+        <Text style={styles.summaryText}>
+          {formattedText}
         </Text>
-        <View style={styles.expandButton}>
-          <Text style={styles.expandButtonText}>
-            {expanded ? "Read Less" : "Read More"}
-          </Text>
-          {expanded ? <ChevronUp size={14} color={COLORS.primary} /> : <ChevronDown size={14} color={COLORS.primary} />}
-        </View>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 });
@@ -152,6 +158,27 @@ const ListCard = React.memo(({ icon, title, items, color }: any) => {
   );
 });
 
+const PatientDetails = React.memo(({ details }: any) => {
+  if (!details) return null;
+  const parts = [
+    details.gender,
+    details.age,
+    details.blood_group ? `Blood Group: ${details.blood_group}` : null
+  ].filter(Boolean);
+  
+  return (
+    <View style={styles.patientCard}>
+      <View style={styles.patientAvatar}>
+        <Text style={styles.avatarText}>{details.name?.[0] || 'P'}</Text>
+      </View>
+      <View style={styles.patientInfo}>
+        <Text style={styles.patientName}>{details.name || 'Patient'}</Text>
+        <Text style={styles.patientSub}>{parts.join(' • ')}</Text>
+      </View>
+    </View>
+  );
+});
+
 export default function AISummaryScreen() {
   const { id } = useLocalSearchParams();
   const { user } = useAuth();
@@ -163,8 +190,6 @@ export default function AISummaryScreen() {
   const [pollCount, setPollCount] = useState(0);
   const [pollingGaveUp, setPollingGaveUp] = useState(false);
   const [isOpeningDoc, setIsOpeningDoc] = useState(false);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [layoutHeight, setLayoutHeight] = useState(0);
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -296,7 +321,8 @@ export default function AISummaryScreen() {
       complaints: Array.isArray(raw.complaints) ? raw.complaints : (Array.isArray(raw.key_complaints) ? raw.key_complaints : []),
       medications: Array.isArray(raw.medications) ? raw.medications : [],
       simple_summary: raw.simple_summary || raw.summary || raw.findings_summary || null,
-      is_medical_document: raw.is_medical_document !== false
+      is_medical_document: raw.is_medical_document !== false,
+      patient_details: raw.patient_details || record.patient_details || null
     };
 
     const getIndicator = (text: string) => {
@@ -371,7 +397,7 @@ export default function AISummaryScreen() {
     return { ...data, filteredFindings };
   }, [record]);
 
-  const isLongContent = contentHeight > layoutHeight + 20;
+
 
   if (isLoading) {
     return (
@@ -408,7 +434,7 @@ export default function AISummaryScreen() {
     if (!record || (!record.signed_url && !record.file_url)) return null;
     return (
       <TouchableOpacity
-        style={[styles.viewFileBtn, !isLongContent && { marginTop: 32 }]}
+        style={styles.viewFileBtn}
         onPress={handleViewDocument}
         activeOpacity={0.8}
         disabled={isOpeningDoc}
@@ -437,15 +463,10 @@ export default function AISummaryScreen() {
 
       <View 
         style={{ flex: 1 }} 
-        onLayout={(e) => setLayoutHeight(e.nativeEvent.layout.height)}
       >
         <ScrollView 
-          contentContainerStyle={[
-            styles.scrollContent,
-            !isLongContent && { flexGrow: 1 }
-          ]} 
+          contentContainerStyle={styles.scrollContent} 
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={(_, h) => setContentHeight(h)}
         >
           <View style={styles.recordBrief}>
             <View style={styles.fileNameRow}>
@@ -473,7 +494,9 @@ export default function AISummaryScreen() {
                 <Text style={styles.emptyText}>The analysis could not identify critical alerts or key findings in this document.</Text>
               </View>
             ) : (
-              <View style={[styles.mainContent, !isLongContent && { flex: 1 }]}>
+              <View style={styles.mainContent}>
+                <PatientDetails details={processedData.patient_details} />
+                
                 {/* 1. AI Summary (Top) */}
                 <SummaryCard text={processedData.simple_summary} />
 
@@ -498,9 +521,6 @@ export default function AISummaryScreen() {
 
                 {/* 5. Key Findings (Last) */}
                 <FindingsCard items={processedData.filteredFindings} />
-
-                {!isLongContent && <View style={{ flex: 1 }} />}
-                {!isLongContent && renderCTA()}
               </View>
             )
           ) : (
@@ -536,11 +556,10 @@ export default function AISummaryScreen() {
           )}
         </ScrollView>
 
-        {isLongContent && (
-          <View style={styles.stickyCTAContainer}>
-            {renderCTA()}
-          </View>
-        )}
+        {/* Permanent Sticky Footer */}
+        <View style={styles.stickyCTAContainer}>
+          {renderCTA()}
+        </View>
       </View>
 
     </SafeAreaView>
@@ -606,11 +625,50 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     letterSpacing: 0.5,
   },
+  // Patient Details Styles
+  patientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  patientAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  avatarText: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  patientInfo: {
+    flex: 1,
+  },
+  patientName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+    marginBottom: 2,
+  },
+  patientSub: {
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    fontWeight: '600',
+  },
   mainContent: {
-    gap: 12,
+    gap: 24,
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -654,9 +712,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryText: {
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: '600',
     color: '#374151',
-    lineHeight: 24,
+    lineHeight: 26,
   },
   expandButton: {
     flexDirection: 'row',
