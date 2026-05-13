@@ -86,17 +86,21 @@ export function AnimatedCard({
             overlayStyle
           ]}
         />
-        <View style={[iconBoxStyle, { position: 'relative' }]}>
-          <Animated.View style={[{ width: iconSize, height: iconSize }, iconAnimStyle]}>
-            <Icon size={iconSize} color={iconColor} />
-          </Animated.View>
-          {iconBoxChildren}
-        </View>
+        {Icon && (
+          <View style={[iconBoxStyle, { position: 'relative' }]}>
+            <Animated.View style={[{ width: iconSize, height: iconSize }, iconAnimStyle]}>
+              <Icon size={iconSize} color={iconColor} />
+            </Animated.View>
+            {iconBoxChildren}
+          </View>
+        )}
         {children}
       </Animated.View>
     </GestureDetector>
   );
 }
+
+export default AnimatedCard;
 
 const styles = StyleSheet.create({
   card: {
