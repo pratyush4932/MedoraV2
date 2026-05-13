@@ -11,7 +11,8 @@ import {
   Upload,
   Hospital,
   LogOut,
-  LucideIcon
+  LucideIcon,
+  Calendar
 } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +55,62 @@ const LogoutButton = ({ onPress }: { onPress: () => void }) => {
              <LogOut size={20} color={COLORS.white} />
            </Animated.View>
         </View>
+      </View>
+    </Pressable>
+  );
+};
+
+const GlowingAppointmentButton = ({ onPress }: { onPress: () => void }) => {
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.15,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <Pressable onPress={onPress}>
+      <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.View 
+          style={{ 
+            position: 'absolute', 
+            width: '100%', 
+            height: '100%', 
+            backgroundColor: COLORS.primary, 
+            borderRadius: ROUNDING.full,
+            opacity: 0.4,
+            transform: [{ scale: pulseAnim }]
+          }} 
+        />
+        <LinearGradient
+          colors={[COLORS.primary, '#00A3A3']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            paddingHorizontal: 16, 
+            paddingVertical: 10, 
+            borderRadius: ROUNDING.full,
+            gap: 8,
+            ...SHADOWS.medium
+          }}
+        >
+          <Calendar size={18} color={COLORS.white} />
+          <Text style={{ color: COLORS.white, fontWeight: '700', fontSize: 14 }}>Book Appt</Text>
+        </LinearGradient>
       </View>
     </Pressable>
   );
@@ -188,6 +245,7 @@ export default function HomeScreen() {
               <Text style={styles.welcomeText}>Welcome back,</Text>
               <Text style={styles.userName}>{user?.name || 'Prithwi'}</Text>
             </View>
+            <GlowingAppointmentButton onPress={() => router.push('/appointment')} />
           </Reanimated.View>
 
           <Reanimated.View entering={FadeInDown.delay(200).duration(600)}>

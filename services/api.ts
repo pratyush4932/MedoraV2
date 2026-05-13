@@ -172,3 +172,18 @@ export const aiService = {
     return response.data.data;
   },
 };
+
+export const appointmentService = {
+  getAvailableDoctors: async () => {
+    const response = await api.get('/appointments/doctors');
+    return response.data;
+  },
+  requestAppointment: async (payload: { doctor_id: string, hospital_id: string, appointment_date: string, time_slot: string }) => {
+    const response = await api.post('/appointments/request', payload);
+    return response.data;
+  },
+  getPatientAppointments: async () => {
+    const response = await api.get('/appointments/patient');
+    return response.data;
+  }
+};
