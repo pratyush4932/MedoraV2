@@ -203,7 +203,9 @@ export default function AppointmentScreen() {
                       <View style={styles.historyBody}>
                         <View style={styles.historyRow}>
                           <User size={16} color={COLORS.primary} />
-                          <Text style={styles.historyInfoText}>Dr. {appt.doctor?.name || 'Unknown'}</Text>
+                          <Text style={styles.historyInfoText}>
+                            {appt.doctor?.name?.startsWith('Dr.') ? appt.doctor.name : `Dr. ${appt.doctor?.name || 'Unknown'}`}
+                          </Text>
                         </View>
                         <View style={styles.historyRow}>
                           <Stethoscope size={16} color={COLORS.primary} />
@@ -273,7 +275,7 @@ export default function AppointmentScreen() {
                         >
                           <View style={styles.docInfo}>
                             <Text style={[styles.docName, isSelected && { color: COLORS.primary }]}>
-                              Dr. {doc.doctor_name}
+                              {doc.doctor_name?.startsWith('Dr.') ? doc.doctor_name : `Dr. ${doc.doctor_name}`}
                             </Text>
                             <Text style={styles.docHospital}>{doc.hospital_name}</Text>
                           </View>
