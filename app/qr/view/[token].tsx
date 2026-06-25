@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { User, FileText, Calendar, ShieldCheck } from 'lucide-react-native';
+import { User, FileText, Calendar, ShieldCheck, Sparkles } from 'lucide-react-native';
 import { COLORS, SPACING, ROUNDING, SHADOWS } from '../../../constants/theme';
 import { Card } from '../../../components/common/Card';
 import { qrService } from '../../../services/api';
@@ -71,6 +71,63 @@ export default function DoctorViewScreen() {
             Below are the latest diagnostic reports and prescriptions.
           </Text>
         </Card>
+
+        {data?.ai_summary && (
+          <>
+            <Text style={styles.sectionTitle}>Longitudinal Health Overview (AI)</Text>
+            <Card style={styles.insightsCard}>
+              <View style={styles.insightHeader}>
+                <View style={styles.insightIconCircle}>
+                  <Sparkles size={18} color={COLORS.primary} />
+                </View>
+                <View style={styles.insightHeaderText}>
+                  <Text style={styles.insightType}>CLINICAL INTELLIGENCE</Text>
+                  <Text style={styles.insightUpdateStatus}>
+                    Processed: {data.ai_summary.last_processed_at ? new Date(data.ai_summary.last_processed_at).toLocaleDateString() : 'Ready'}
+                  </Text>
+                </View>
+              </View>
+              
+              <Text style={styles.insightDescription}>
+                {data.ai_summary.overall_health_picture 
+                  ? (Array.isArray(data.ai_summary.overall_health_picture) 
+                      ? data.ai_summary.overall_health_picture.join('\n') 
+                      : data.ai_summary.overall_health_picture)
+                  : 'No longitudinal patterns identified yet.'}
+              </Text>
+
+              {data.ai_summary.identified_patterns && data.ai_summary.identified_patterns.length > 0 && (
+                <View style={styles.patternsContainer}>
+                  <Text style={styles.patternsLabel}>Identified Patterns:</Text>
+                  <View style={styles.patternsGrid}>
+                    {data.ai_summary.identified_patterns.map((item: any, idx: number) => (
+                      <View key={idx} style={styles.patternChip}>
+                        <View style={styles.patternDot} />
+                        <Text style={styles.patternText}>{item?.pattern || item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {data.ai_summary.clinical_signals && data.ai_summary.clinical_signals.length > 0 && (
+                <View style={styles.patternsContainer}>
+                  <Text style={styles.patternsLabel}>Clinical Signals:</Text>
+                  <View style={styles.patternsGrid}>
+                    {data.ai_summary.clinical_signals.map((item: any, idx: number) => (
+                      <View key={idx} style={[styles.patternChip, { backgroundColor: COLORS.accent + '15' }]}>
+                        <View style={[styles.patternDot, { backgroundColor: COLORS.accent }]} />
+                        <Text style={[styles.patternText, { color: COLORS.accent }]}>
+                          {item?.signal || item} ({item?.confidence || 'low'} confidence)
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </Card>
+          </>
+        )}
 
         <Text style={styles.sectionTitle}>Shared Records</Text>
         {data?.records?.map((record: any) => (
@@ -223,5 +280,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  insightsCard: {
+    padding: SPACING.md,
+    backgroundColor: COLORS.white,
+    borderRadius: ROUNDING.md,
+    marginBottom: SPACING.md,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+  },
+  insightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+    gap: 8,
+  },
+  insightIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: ROUNDING.full,
+    backgroundColor: COLORS.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  insightHeaderText: {
+    flex: 1,
+  },
+  insightType: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
+    letterSpacing: 0.8,
+  },
+  insightUpdateStatus: {
+    fontSize: 10,
+    color: COLORS.text.secondary,
+    marginTop: 1,
+  },
+  insightDescription: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
+    lineHeight: 20,
+    marginBottom: SPACING.md,
+  },
+  patternsContainer: {
+    marginTop: SPACING.sm,
+  },
+  patternsLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginBottom: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  patternsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: SPACING.sm,
+  },
+  patternChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '10',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: ROUNDING.sm,
+    gap: 6,
+  },
+  patternDot: {
+    width: 6,
+    height: 6,
+    borderRadius: ROUNDING.full,
+    backgroundColor: COLORS.primary,
+  },
+  patternText: {
+    fontSize: 11,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });

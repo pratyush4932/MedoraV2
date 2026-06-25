@@ -150,8 +150,12 @@ export const recordService = {
 };
 
 export const qrService = {
-  generateQR: async (recordIds: string[], expiresIn: number = 3600) => {
-    const response = await api.post('/qr/generate', { record_ids: recordIds, expires_in: expiresIn });
+  generateQR: async (recordIds: string[], expiresIn: number = 3600, shareOption: string = 'all') => {
+    const response = await api.post('/qr/generate', { 
+      record_ids: recordIds, 
+      expires_in: expiresIn,
+      share_option: shareOption
+    });
     return response.data;
   },
   getQRData: async (token: string) => {

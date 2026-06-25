@@ -135,7 +135,7 @@ export default function QRGenerateScreen() {
       }
 
       console.log('[QR] Generating token for record IDs:', selectedIds);
-      const data = await qrService.generateQR(selectedIds, 3600);
+      const data = await qrService.generateQR(selectedIds, 3600, selectedOption);
       console.log('[QR] Token generated successfully:', data);
       
       setToken(data.token);
